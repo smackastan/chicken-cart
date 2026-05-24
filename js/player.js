@@ -3,10 +3,34 @@
 // player.z is the camera position; the player sprite sits playerZ ahead of it.
 // ===========================================================================
 
+// Ease `speed` toward a (possibly lowered) cap with forward momentum/inertia.
+// When over the cap, the chicken DRAGS down gradually (dragDecel) instead of
+// snapping, so involuntary slowdowns (mud / 'slower' / egg-spin) feel smooth.
+// `braking` overspeed (the player actively braking) is left to the caller and
+// stays responsive. Always clamps the lower bound at 0 and the absolute ceiling.
+function applyDragToCap(speed, cap, dt) {
+  var C = CK.C;
+  if (speed > cap) {
+    speed -= C.dragDecel * dt;   // gentle bleed toward the lowered cap
+    if (speed < cap) speed = cap; // don't overshoot below the cap
+  }
+  // Absolute ceiling: the fastest anyone should ever travel. Never cut below the
+  // caller's own cap (AI catch-up rubber-banding can exceed maxSpeed * 1.4).
+  var ceiling = Math.max(C.maxSpeed * 1.4, cap);
+  if (speed > ceiling) speed = ceiling;
+  return clamp(speed, 0, ceiling);
+}
+
 CK.updatePlayer = function (dt) {
   var C = CK.C, p = CK.player, k = CK.keys;
   var playerSegment = findSegment(p.z);
   var speedPercent = p.speed / C.maxSpeed;
+
+  // lateral steering momentum: input ramps in/out so it doesn't snap, but
+  // stays snappy enough (steerEase) that steering never feels laggy.
+  var steerTarget = (k.left ? -1 : 0) + (k.right ? 1 : 0);
+  if (p.steer === undefined) p.steer = 0;
+  p.steer += (steerTarget - p.steer) * Math.min(1, C.steerEase * dt);
   var dx = dt * 2 * speedPercent; // steering rate scales with speed
   var startZ = p.z;
 
@@ -15,9 +39,8 @@ CK.updatePlayer = function (dt) {
   else if (k.down) p.speed = accelerate(p.speed, C.breaking, dt);
   else             p.speed = accelerate(p.speed, C.decel, dt);
 
-  // steering
-  if (k.left)  p.x -= dx;
-  if (k.right) p.x += dx;
+  // steering (eased via p.steer)
+  p.x += dx * p.steer;
 
   // centrifugal pull outward on curves
   p.x -= dx * speedPercent * playerSegment.curve * C.centrifugal;
@@ -25,7 +48,7 @@ CK.updatePlayer = function (dt) {
   // determine top speed from powerups / status effects
   var topSpeed = C.maxSpeed;
   if (p.powerup === 'faster') topSpeed = C.maxSpeed * 1.4;
-  if (p.powerup === 'slower') topSpeed = Math.min(topSpeed, C.maxSpeed * 0.45);
+  if (p.powerup === 'slower') topSpeed = Math.min(topSpeed, C.maxSpeed * 0.55);
   if (p.spinTimer > 0) {
     topSpeed = Math.min(topSpeed, C.maxSpeed * 0.25);
     p.x += Math.sin(p.spinTimer * 25) * 0.06; // wobble while spun
@@ -37,7 +60,12 @@ CK.updatePlayer = function (dt) {
   }
 
   p.x = clamp(p.x, -2, 2);
-  p.speed = clamp(p.speed, 0, topSpeed);
+  // Intentional braking (S key) stays responsive; involuntary slowdowns ease.
+  if (k.down) {
+    p.speed = clamp(p.speed, 0, topSpeed);
+  } else {
+    p.speed = applyDragToCap(p.speed, topSpeed, dt);
+  }
   p.z = increase(p.z, dt * p.speed, CK.trackLength);
 
   // timers

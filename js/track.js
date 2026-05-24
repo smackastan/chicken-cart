@@ -27,6 +27,11 @@ function addSegment(curve, y) {
 }
 
 function addRoad(enter, hold, leave, curve, y) {
+  // Double the length of every track (same shape) via trackLengthMul.
+  var m = CK.C.trackLengthMul || 1;
+  enter = Math.round(enter * m);
+  hold = Math.round(hold * m);
+  leave = Math.round(leave * m);
   var startY = lastY();
   var endY = startY + (y * CK.C.segmentLength);
   var total = enter + hold + leave;

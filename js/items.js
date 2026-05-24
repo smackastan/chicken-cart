@@ -6,6 +6,10 @@ CK.boxes = [];
 CK.hazards = [];
 CK.eggs = [];
 
+// Cooldowns (seconds) so impact SFX don't retrigger every frame while
+// overlapping. Decremented by dt at the top of CK.updateItems.
+var smashCd = 0, squishCd = 0;
+
 function isInvincible(r) {
   return r.powerup === 'invincible' && r.powerupTimer > 0;
 }
@@ -116,6 +120,19 @@ CK.updateItems = function (dt) {
   var airborne = p.jumpTimer > 0;
   var i, j;
 
+  // Bleed down impact-SFX cooldowns.
+  if (smashCd > 0) smashCd -= dt;
+  if (squishCd > 0) squishCd -= dt;
+
+  // Bleed down per-car "angry" timers (e.g. Diablo fuming after a hit).
+  // Created lazily on the car object, so guard for undefined.
+  if (CK.cars) {
+    for (i = 0; i < CK.cars.length; i++) {
+      var ac = CK.cars[i];
+      if (ac && ac.angryTimer > 0) ac.angryTimer -= dt;
+    }
+  }
+
   // powerup boxes (player only)
   for (i = 0; i < CK.boxes.length; i++) {
     var box = CK.boxes[i];
@@ -128,9 +145,15 @@ CK.updateItems = function (dt) {
         Math.abs(p.x - box.offset) < 0.5) {
       if (box.type === 'egg') {
         p.eggs = Math.min(p.eggs + 2, 9);   // ammo box: +2 eggs
+        if (CK.carSfx && CK.carSfx.pickupEgg) CK.carSfx.pickupEgg();
       } else {
-        if (box.type === 'faster') p.score += 1;
-        else if (box.type === 'invincible') p.score += 2;
+        if (box.type === 'faster') {
+          p.score += 1;
+          if (CK.carSfx && CK.carSfx.boost) CK.carSfx.boost();
+        } else if (box.type === 'invincible') {
+          p.score += 2;
+          if (CK.carSfx && CK.carSfx.pickupInvincible) CK.carSfx.pickupInvincible();
+        }
         applyPowerup(p, box.type);
       }
       box.active = false;
@@ -146,12 +169,34 @@ CK.updateItems = function (dt) {
         Math.abs(p.x - h.offset) < 0.45) {
       p.powerup = 'slower';
       p.powerupTimer = Math.max(p.powerupTimer, 1.5);
+      // Wet splat when the player slogs through mud/a pothole.
+      if (squishCd <= 0 && CK.carSfx && CK.carSfx.squish) {
+        CK.carSfx.squish();
+        squishCd = 0.7;
+      }
     }
     for (j = 0; j < CK.cars.length; j++) {
       var c = CK.cars[j];
       if (Math.abs(forwardGap(c.z, h.z)) < C.segmentLength &&
           Math.abs(c.offset - h.offset) < 0.45) {
         c.mudTimer = Math.max(c.mudTimer, 1.5);
+      }
+    }
+  }
+
+  // Collision CRUNCH when the player overlaps another car/chicken (sound only;
+  // does NOT change physics/speeds). Cooldown-gated so it fires once per hit.
+  if (smashCd <= 0 && CK.carSfx && CK.carSfx.smash) {
+    for (j = 0; j < CK.cars.length; j++) {
+      var col = CK.cars[j];
+      if (col.finished) continue;
+      if (Math.abs(forwardGap(p.z, col.z)) < C.segmentLength * 0.6 &&
+          Math.abs(p.x - col.offset) < 0.4) {
+        CK.carSfx.smash();
+        smashCd = 0.5;
+        // Hitting Diablo makes him fume: raise his fist + pour smoke.
+        if (col.evil) col.angryTimer = 2.0;
+        break;
       }
     }
   }
@@ -184,7 +229,17 @@ CK.updateItems = function (dt) {
       var rLat = r.isPlayer ? r.x : r.offset;
       if (Math.abs(forwardGap(r.z, egg.z)) < ztol && Math.abs(rLat - egg.offset) < 0.4) {
         r.spinTimer = 1.6;
-        if (r.isPlayer) { r.score -= 2; r.splatTimer = 1.0; }
+        // The player egging Diablo makes him fume: raise his fist + pour smoke.
+        if (r.evil && egg.owner && egg.owner.isPlayer) r.angryTimer = 2.0;
+        if (r.isPlayer) {
+          r.score -= 2;
+          r.splatTimer = 1.0;
+          r.lastHitBy = egg.owner && egg.owner.name ? egg.owner.name : 'a rival';
+          // The evil chicken cackles when his egg lands on the player.
+          if (egg.owner && egg.owner.evil) {
+            if (CK.sound && CK.sound.evilLaugh) CK.sound.evilLaugh();
+          }
+        }
         egg.dead = true;
         anyDead = true;
         break;

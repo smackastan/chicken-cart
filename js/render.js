@@ -79,12 +79,58 @@ function renderPlayer(ctx, speedPercent, scale, destX, destY, steer, spinning) {
   renderSprite(ctx, spr, scale, destX, destY + bounce, -0.5, -1, 0);
 }
 
+// A small floating nametag centered at (cx, y), drawn with a dark outline so the
+// pixel/monospace text stays legible against the gray road or green grass.
+function drawNametag(ctx, name, cx, y) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.font = 'bold 13px monospace';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText(name, cx, y);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(name, cx, y);
+  ctx.restore();
+}
+
 function drawCloud(ctx, x, y, r) {
   ctx.beginPath();
   ctx.arc(x, y, r * 0.5, 0, 7);
   ctx.arc(x + r * 0.4, y - r * 0.2, r * 0.4, 0, 7);
   ctx.arc(x + r * 0.8, y, r * 0.5, 0, 7);
   ctx.fill();
+}
+
+// A few rising, fading gray puffs above (cx, topY) — e.g. smoke pouring from
+// Diablo's cart when he's been hit. Each puff has its own phase (driven by CK.t,
+// offset by seed+index) so it rises and fades on its own cycle. `scale` ties the
+// puff size to the on-screen sprite size. Cheap + clamped; never throws.
+function drawSmoke(ctx, cx, topY, scale, seed) {
+  if (!isFinite(cx) || !isFinite(topY)) return;
+  var s = Math.max(0.15, Math.min(scale || 1, 30));   // clamp so it stays cheap/sane
+  var puffs = 4;
+  var baseR = Math.max(2, 6 * s);
+  var rise = 18 * s;                                   // how far a puff travels up
+  var t = (typeof CK !== 'undefined' && CK.t) ? CK.t : 0;
+  var sd = seed || 0;
+  ctx.save();
+  ctx.fillStyle = '#777777';
+  for (var k = 0; k < puffs; k++) {
+    var phase = (t * 0.9 + (sd + k) * 0.37) % 1;       // 0..1 lifecycle per puff
+    var sway = Math.sin((t * 2.2) + (sd + k) * 1.7) * baseR * 0.6;
+    var px = cx + sway;
+    var py = topY - phase * rise - baseR * 0.5;
+    var pr = baseR * (0.5 + phase * 0.9);              // grows as it rises
+    var alpha = 0.5 * (1 - phase);                     // fades out toward the top
+    if (alpha <= 0.02 || pr < 0.3) continue;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, 7);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawBackground(ctx) {
@@ -103,6 +149,106 @@ function drawBackground(ctx) {
     var cx = (((i * 0.4) - off + 1) % 1) * C.width;
     drawCloud(ctx, cx, 55 + i * 32, 50 + i * 12);
   }
+}
+
+// Rearview mirror inset (top-left): a simple receding-road backdrop with the
+// racers BEHIND the player drawn as rear-view sprites, x-flipped like a mirror.
+// Deliberately NOT full pseudo-3D — just a clean trapezoid road + scaled chickens.
+function renderMirror(ctx) {
+  var C = CK.C;
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  // mirror rect (top-left)
+  var mx = 12, my = 10, mw = 300, mh = 96;
+  var horizonY = my + mh * 0.42;
+
+  ctx.save();
+
+  // clip everything (backdrop + sprites) to the mirror rect
+  ctx.beginPath();
+  ctx.rect(mx, my, mw, mh);
+  ctx.clip();
+
+  // backdrop: sky tint (upper ~42%) + grass green (lower part)
+  ctx.fillStyle = COLORS.SKY;
+  ctx.fillRect(mx, my, mw, horizonY - my);
+  ctx.fillStyle = COLORS.LIGHT.grass;
+  ctx.fillRect(mx, horizonY, mw, (my + mh) - horizonY);
+
+  // gray road trapezoid: narrow at horizon, wide at bottom, with light rumble edges
+  var cxm = mx + mw / 2;
+  var topHalf = mw * 0.06;   // half-width of road at horizon
+  var botHalf = mw * 0.34;   // half-width of road at bottom
+  var rumble = mw * 0.04;    // rumble edge thickness at bottom
+  var topRumble = rumble * (topHalf / botHalf);
+  var bottomY = my + mh;
+
+  // left rumble
+  polygon(ctx,
+    cxm - topHalf - topRumble, horizonY, cxm - topHalf, horizonY,
+    cxm - botHalf, bottomY, cxm - botHalf - rumble, bottomY, COLORS.LIGHT.rumble);
+  // right rumble
+  polygon(ctx,
+    cxm + topHalf, horizonY, cxm + topHalf + topRumble, horizonY,
+    cxm + botHalf + rumble, bottomY, cxm + botHalf, bottomY, COLORS.LIGHT.rumble);
+  // road surface
+  polygon(ctx,
+    cxm - topHalf, horizonY, cxm + topHalf, horizonY,
+    cxm + botHalf, bottomY, cxm - botHalf, bottomY, COLORS.LIGHT.road);
+
+  // collect racers behind the player within range
+  var maxDist = C.segmentLength * 30;
+  var behind = [];
+  if (CK.cars) {
+    for (var i = 0; i < CK.cars.length; i++) {
+      var c = CK.cars[i];
+      if (!c || !c.sprite || !c.sprite.img || !c.sprite.h) continue;
+      var d = forwardGap(CK.player.z, c.z);
+      if (d > 0 && d <= maxDist) behind.push({ c: c, d: d });
+    }
+  }
+  // sort FAR -> NEAR so nearer racers overdraw
+  behind.sort(function (a, b) { return b.d - a.d; });
+
+  ctx.imageSmoothingEnabled = false;
+  for (var j = 0; j < behind.length; j++) {
+    var c = behind[j].c, d = behind[j].d;
+    var t = d / maxDist;                            // 0 near .. 1 far
+    var baseY = lerp(my + mh * 0.97, my + mh * 0.45, t);
+    // When the player has hit Diablo, show his raised-fist sprite + smoke here —
+    // this mirror is where the player usually sees him (leashed ~25ft behind).
+    var mAngry = c.evil && c.angryTimer > 0;
+    var mSprite = (mAngry && CK.sprites && CK.sprites.diabloAngry) ? CK.sprites.diabloAngry : c.sprite;
+    var sc = (mh * 0.62 / mSprite.h) * (1 - 0.78 * t);
+    if (sc <= 0) continue;
+    var spread = (mw * 0.46) * (1 - 0.55 * t);
+    var x = mx + mw / 2 - c.offset * spread;        // x-flip: mirror the lateral offset
+    var w = mSprite.w * sc, h = mSprite.h * sc;
+    ctx.drawImage(mSprite.img, 0, 0, mSprite.w, mSprite.h,
+      x - w / 2, baseY - h, w, h);
+    if (mAngry) drawSmoke(ctx, x, baseY - h, sc, c.z || j);  // clipped to mirror rect
+  }
+
+  ctx.restore();
+
+  // mirror frame: dark outer + lighter inner stroke
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeRect(mx - 1, my - 1, mw + 2, mh + 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(220,220,220,0.9)';
+  ctx.strokeRect(mx + 1, my + 1, mw - 2, mh - 2);
+
+  // tiny "REAR VIEW" label in the corner of the mirror
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText('REAR VIEW', mx + 7, my + 6);
+  ctx.fillStyle = '#fff';
+  ctx.fillText('REAR VIEW', mx + 6, my + 5);
+  ctx.restore();
 }
 
 CK.render = function () {
@@ -162,8 +308,27 @@ CK.render = function () {
       var cs = interpolate(segment.p1.screen.scale, segment.p2.screen.scale, car.percent);
       var cx = interpolate(segment.p1.screen.x, segment.p2.screen.x, car.percent) + (cs * car.offset * C.roadWidth * C.width / 2);
       var cy = interpolate(segment.p1.screen.y, segment.p2.screen.y, car.percent);
-      // eggs render 1.6x so they're easy to spot on the road
-      renderSprite(ctx, car.sprite, car.isEgg ? cs * 1.6 : cs, cx, cy, -0.5, -1, segment.clip);
+      // eggs render 1.6x so they're easy to spot; racers scale per chicken (BIG CARL big, Peewee small)
+      var carScale = car.scale || 1;
+      // When the player has hit Diablo, he raises his fist and pours smoke.
+      var drawSprite = car.sprite;
+      var angry = car.evil && car.angryTimer > 0;
+      if (angry && CK.sprites && CK.sprites.diabloAngry) drawSprite = CK.sprites.diabloAngry;
+      var drawScale = car.isEgg ? cs * 1.6 : cs * carScale;
+      renderSprite(ctx, drawSprite, drawScale, cx, cy, -0.5, -1, segment.clip);
+      if (angry) {
+        // top of the drawn sprite on screen (sprite is bottom-anchored at cy)
+        var onScreenH = drawSprite.h * drawScale * (C.width / 2) * C.spriteScale * C.roadWidth;
+        if (onScreenH > 4 && onScreenH < C.height * 3) {
+          drawSmoke(ctx, cx, cy - onScreenH, onScreenH / 40, car.z || i);
+        }
+      }
+      // floating nametag above named racers (skip eggs); only when the sprite is
+      // big enough on screen that the label stays readable rather than clutter
+      if (car.name) {
+        var spriteH = car.sprite.h * cs * carScale * (C.width / 2) * C.spriteScale * C.roadWidth;
+        if (spriteH > 44) drawNametag(ctx, car.name, cx, cy - spriteH - 6);
+      }
     }
 
     for (i = 0; i < segment.sprites.length; i++) {
@@ -228,6 +393,11 @@ CK.render = function () {
     ctx.globalAlpha = Math.max(0, 1 - tp * 0.7);
     ctx.drawImage(egg.img, 0, 0, egg.w, egg.h, Math.round(ex), Math.round(ey), Math.round(ew), Math.round(eh));
     ctx.globalAlpha = 1;
+  }
+
+  // rearview mirror (top-left) — only during the race / countdown
+  if (CK.state === STATE.RACING || CK.state === STATE.COUNTDOWN) {
+    renderMirror(ctx);
   }
 
   CK.hud.render(ctx);

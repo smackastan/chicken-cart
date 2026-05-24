@@ -188,6 +188,49 @@ var BANNER_GRID = [
   "......PP......"
 ];
 
+// The chicken girlfriend: a standing sweetheart hen, clearly distinct from the
+// racers. Soft lavender/pink feathers, white belly, long eyelashes, rosy cheeks,
+// red lipstick, and a flower on her head. No cart — she stands on little feet.
+// Palette: F=flower petals, f=flower center, V=lavender feathers, v=lavender shade,
+// W=white feathers, R=red comb, L=eyelash/lipstick dark, C=rosy cheek, B=beak,
+// E=eye, K=feet/legs.
+var GIRLFRIEND_GRID = [
+  ".......F.F.F.......",
+  "......FFFFFFF......",
+  ".......FfFfF.......",
+  "........RRR........",
+  ".......RRRRR.......",
+  "......VVVVVVV......",
+  ".....LVVVVVVVL.....",
+  ".....VVVVVVVVV.....",
+  "....VVEVVVVVEVV....",
+  "....VVVVBBVVVVV....",
+  "...VVCVVBBVVCVVV...",
+  "...VVVVVLLVVVVVV...",
+  "..VVVVVVVVVVVVVVV..",
+  "..VvVWWWWWWWWWvVV..",
+  ".VVvWWWWWWWWWWWvVV.",
+  ".VVWWWWWWWWWWWWWVV.",
+  ".VVWWWWWWWWWWWWWVV.",
+  "..VWWWWWWWWWWWWWV..",
+  "..vWWWWWWWWWWWWWv..",
+  "...WWWWWWWWWWWWW...",
+  "....KK.......KK....",
+  "...KKKK.....KKKK..."
+];
+
+// A simple plump heart for the cutscenes.
+var HEART_GRID = [
+  ".HH...HH.",
+  "HHHHHHHHH",
+  "HHHHHHHHH",
+  "HHHHHHHHH",
+  ".HHHHHHH.",
+  "..HHHHH..",
+  "...HHH...",
+  "....H...."
+];
+
 function makeSprite(grid, palette) {
   var h = grid.length, w = grid[0].length;
   var cv = document.createElement('canvas');
@@ -247,6 +290,121 @@ function makePlayerTurn(color, dir) {
   return makeSprite(turnGrid(PLAYER_GRID, dir), kartPalette(color));
 }
 
+// ---- named racers: per-chicken accessories baked onto the base chicken grid ----
+// Accessory chars (added to kartPalette): P=bow pink, H=hat black, h=hat band,
+// M=mustache dark, e=angry red eye. All confined to the head rows (top of grid)
+// so they ride along when turnGrid shifts the head, and stay clear of the cart.
+function racerPalette(color, evil) {
+  var pal = kartPalette(color);
+  pal['P'] = '#FF6FB5';        // bow pink
+  pal['p'] = '#D14E8E';        // bow pink shade
+  pal['H'] = '#101014';        // hat black
+  pal['h'] = '#8a1212';        // hat band / dark crimson accent
+  pal['M'] = '#1a1208';        // mustache dark
+  pal['e'] = '#E23B3B';        // angry red eye
+  if (evil) {
+    // sinister palette: dark, bloodshot feathers + crimson comb
+    pal['W'] = '#cfc7c7';
+    pal['w'] = '#9a8f8f';
+    pal['R'] = '#8a1212';
+  }
+  return pal;
+}
+
+// Overlay accessory pixels onto a row: paint the accessory char wherever it is
+// non-'.', otherwise keep the base pixel. (over and base must be equal length.)
+function overlayRow(base, over) {
+  var out = '';
+  for (var x = 0; x < base.length; x++) {
+    out += over[x] !== '.' ? over[x] : base[x];
+  }
+  return out;
+}
+
+// Build a racer's grid. We bake face accessories (bow / mustache) onto the base
+// chicken FIRST so the head turn carries them along (they sit in the head rows
+// 2-7 that turnGrid shifts), then apply the turn, then prepend a top hat (which
+// lives above the comb and grows the grid upward; sprites are bottom-anchored so
+// ground alignment is preserved). All rows stay 19 wide.
+function racerGrid(spec, dir) {
+  var g = KART_GRID.slice();
+
+  if (spec.accessory === 'bow') {
+    // a hair bow on the forehead: two loops + a center knot, in contrasting pink
+    g[2] = overlayRow(g[2], ".......PP.PP.......");
+    g[3] = overlayRow(g[3], ".......PPpPP.......");
+    g[4] = overlayRow(g[4], ".......PP.PP.......");
+  } else if (spec.accessory === 'mustache') {
+    // handlebar mustache across the lower face, with angry eyes either side
+    g[5] = overlayRow(g[5], ".....e.....e.......");
+    g[6] = overlayRow(g[6], "...MM.......MM.....");
+    g[7] = overlayRow(g[7], "..MMMMM...MMMMM....");
+  }
+
+  if (dir) g = turnGrid(g, dir);
+
+  if (spec.accessory === 'hat') {
+    // black top hat above the comb. Hat art is 17 wide; pad each row to the
+    // 19-wide grid so all rows stay equal length.
+    var crown = '...HHHHHHHHHHH...';
+    var band  = '...HhhhhhhhhhH...';
+    var brim  = '.HHHHHHHHHHHHHHH.';
+    function pad(s) { return '.' + s + '.'; }
+    g = [pad(crown), pad(crown), pad(band), pad(brim)].concat(g);
+  }
+
+  return g;
+}
+
+function makeRacerSprite(spec, color, dir) {
+  return makeSprite(racerGrid(spec, dir), racerPalette(color, spec.evil));
+}
+
+// Diablo, mid-tantrum: his usual rear-view look (dark crimson body, mustache,
+// angry red eyes) but with a clenched fist thrust up over the right side of the
+// cart. We bake the mustache + angry eyes onto KART_GRID exactly like the normal
+// Diablo (head rows 5-7), then PREPEND four rows above the body holding a dark
+// arm ('B' = crimson body color) and a clenched fist ('h' = dark crimson accent
+// for knuckle highlights, 'M' = dark outline). The grid grows upward; since
+// sprites are bottom-anchored, ground alignment is preserved. All rows are 19
+// wide so makeSprite stays happy.
+function diabloAngryGrid() {
+  var g = KART_GRID.slice();
+  // same mustache + angry eyes as the mustache accessory
+  g[5] = overlayRow(g[5], ".....e.....e.......");
+  g[6] = overlayRow(g[6], "...MM.......MM.....");
+  g[7] = overlayRow(g[7], "..MMMMM...MMMMM....");
+  // raised fist over the cart's right side (player's view). The fist is a few
+  // pixels tall; the arm drops down to meet the body. 19 wide each.
+  var fist = [
+    ".............MMM...",   // clenched fist top (dark outline)
+    "...........MMhhhM..",   // knuckles (crimson highlight)
+    "...........MhhhhM..",   // fist body
+    "............MBBM..."    // wrist/arm into body
+  ];
+  return fist.concat(g);
+}
+
+function makeDiabloAngry() {
+  return makeSprite(diabloAngryGrid(), racerPalette('#3A0E10', true));
+}
+
+// The 10 named opponents, in fixed roster order. Each gets a distinct cart color
+// (none is the player's cyan #19D3DA), an optional baked-on accessory, a render
+// scale, and an `evil` flag. ai.js copies name/scale/evil onto each AI car.
+var RACER_SPECS = [
+  { name: 'Clucky',    color: '#E8413A', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Chicky',    color: '#F062A8', accessory: 'bow',      scale: 1.0,  evil: false },
+  { name: 'Cornelius', color: '#3A6B3A', accessory: 'hat',      scale: 1.0,  evil: false },
+  { name: 'Peewee',    color: '#F4C20D', accessory: null,       scale: 0.82, evil: false },
+  { name: 'BIG CARL',  color: '#FF8C42', accessory: null,       scale: 1.4,  evil: false },
+  { name: 'Gus',       color: '#2ECC71', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Rus',       color: '#9B59B6', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Anabelle',  color: '#E78BB0', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Bessy',     color: '#5DADE2', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Diablo',    color: '#3A0E10', accessory: 'mustache', scale: 1.0,  evil: true  }
+];
+
 CK.buildSprites = function () {
   var aiColors = ['#E8413A', '#2ECC71', '#3498DB', '#F4C20D', '#9B59B6', '#FF8C42'];
   // each AI kart has straight + look-left/right (head turned, eye on that side)
@@ -254,14 +412,43 @@ CK.buildSprites = function () {
     return { straight: makeKart(c), left: makeKartTurn(c, -1), right: makeKartTurn(c, 1) };
   });
 
+  // named racers: straight + head-turn variants, with accessories baked in
+  var racers = RACER_SPECS.map(function (spec) {
+    return {
+      name: spec.name,
+      scale: spec.scale,
+      evil: spec.evil,
+      straight: makeRacerSprite(spec, spec.color, 0),
+      left: makeRacerSprite(spec, spec.color, -1),
+      right: makeRacerSprite(spec, spec.color, 1)
+    };
+  });
+
   var playerColor = '#19D3DA'; // distinct cyan cart for the player
   CK.sprites = {
     karts: karts,
+    racers: racers,
+    diabloAngry: makeDiabloAngry(),  // raised-fist Diablo for when the player hits him
     player: {
       straight: makeSprite(PLAYER_GRID, kartPalette(playerColor)),
       left: makePlayerTurn(playerColor, -1),
       right: makePlayerTurn(playerColor, 1)
     },
+    girlfriend: makeSprite(GIRLFRIEND_GRID, {
+      '.': null,
+      'F': '#FF8FC8',   // flower petals (pink)
+      'f': '#FFE15A',   // flower center (yellow)
+      'V': '#C9A7F0',   // lavender feathers
+      'v': '#A87FD6',   // lavender shade
+      'W': '#FFFFFF',   // white belly feathers
+      'R': '#E23B3B',   // red comb
+      'L': '#C81E5A',   // eyelashes / lipstick
+      'C': '#FF9EC2',   // rosy cheeks
+      'B': '#F4B400',   // beak
+      'E': '#101014',   // eyes
+      'K': '#E89A2B'    // legs / feet
+    }),
+    heart: makeSprite(HEART_GRID, { '.': null, 'H': '#FF3B6B' }),
     egg: makeSprite(EGG_GRID, { '.': null, 'O': '#1a1a1a', 'W': '#FFFFFF', 'h': '#CFEFFF' }),
     boxes: {
       faster: makeSprite(BOX_FASTER_GRID, { '.': null, 'O': '#16461f', 'B': '#2ECC71', 'i': '#FFFFFF' }),

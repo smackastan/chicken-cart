@@ -11,13 +11,18 @@ CK.init = function () {
   var C = CK.C;
   C.cameraDepth = 1 / Math.tan((C.fieldOfView / 2) * Math.PI / 180);
   C.playerZ = C.cameraHeight * C.cameraDepth;
-  C.maxSpeed = C.segmentLength / (1 / 60);
+  C.maxSpeed = C.segmentLength / (1 / 60) * C.speedScale;
   C.accel = C.maxSpeed / 5;
   C.breaking = -C.maxSpeed;
   C.decel = -C.maxSpeed / 5;
   C.offRoadDecel = -C.maxSpeed / 2;
   C.offRoadLimit = C.maxSpeed / 4;
+  C.dragDecel = C.maxSpeed * C.dragDecelMul;
   C.resolution = C.height / 480;
+
+  // feet -> world-units conversion from the speed scale, then Diablo's max leash:
+  // he can never trail the player by more than 25 feet.
+  C.diabloLeash = 25 * (C.maxSpeed / (C.topSpeedMph * 5280 / 3600));
 
   CK.trackIndex = 0;
   CK.trophiesWon = [false, false, false]; // persists across the session
@@ -33,8 +38,9 @@ CK.init = function () {
 CK.restart = function () {
   CK.player = {
     isPlayer: true,
-    z: 0, x: 0, speed: 0,
+    z: 0, x: 0, speed: 0, steer: 0,
     lap: 0, finished: false, finishOrder: 0, position: 1,
+    lastHitBy: null,
     powerup: null, powerupTimer: 0,
     spinTimer: 0,
     eggs: 3, eggCooldown: 0, eggTossTimer: 0, eggTossX: 0,
@@ -49,6 +55,8 @@ CK.restart = function () {
   CK.buildRacers();
 
   CK.awarded = false;
+  CK.outcome = null;
+  CK.cutsceneStart = 0;
   CK.state = STATE.INTRO;
   CK.introTimer = CK.C.introDuration;
   CK.countdown = 3.0;
@@ -87,6 +95,16 @@ CK.update = function (dt) {
     if (CK.player.finished && !CK.awarded) {
       CK.awarded = true;
       if (CK.player.position === 1) CK.trophiesWon[CK.trackIndex] = true;
+
+      // Determine the results-screen outcome (positions are fresh here) and
+      // capture the moment of finishing for hud.js cutscenes.
+      var diablo = null;
+      for (var d = 0; d < CK.cars.length; d++) {
+        if (CK.cars[d].evil) { diablo = CK.cars[d]; break; }
+      }
+      CK.outcome = (CK.player.position === 1) ? 'win' :
+                   ((diablo && diablo.position < CK.player.position) ? 'loseToDiablo' : 'normal');
+      CK.cutsceneStart = CK.t;
     }
   }
 };

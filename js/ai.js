@@ -46,11 +46,19 @@ CK.buildRacers = function () {
       mudTimer: 0,
       eggCooldown: rand(2, 5),
       shootCooldown: rand(2, 5),
-      baseMax: C.maxSpeed * rand(1.0, 1.08) * CK.tracks[CK.trackIndex].aiMul,
-      spriteSet: CK.sprites.karts[i % CK.sprites.karts.length],
       look: 'straight',
       percent: percentRemaining(z, C.segmentLength)
     };
+    // chicken identity from the visuals agent's racer roster
+    car.spriteSet = CK.sprites.racers[i];
+    car.name = car.spriteSet.name;
+    car.scale = car.spriteSet.scale;
+    car.evil = car.spriteSet.evil;
+    // Every chicken is 20% faster than the player's base top speed. Keep a small
+    // per-car variance (~±2%), the per-track aiMul as a secondary factor, and a
+    // tiny extra edge for the evil car (kept modest so they stay beatable).
+    car.baseMax = C.maxSpeed * 1.2 * rand(0.98, 1.02) * CK.tracks[CK.trackIndex].aiMul *
+                  (car.evil ? 1.04 : 1.0);
     car.sprite = car.spriteSet.straight;
     CK.cars.push(car);
     findSegment(car.z).cars.push(car);
@@ -98,8 +106,9 @@ CK.updateAI = function (dt) {
     car.look = look;
     car.sprite = car.spriteSet[look];
 
-    // Track 3: shoot eggs FORWARD at the player when they're ahead and roughly in line
-    if (CK.tracks[CK.trackIndex].forwardEggs) {
+    // Shoot eggs FORWARD at the player when they're ahead and roughly in line.
+    // Gated to forwardEggs tracks OR evil cars (who do it everywhere).
+    if (CK.tracks[CK.trackIndex].forwardEggs || car.evil) {
       if (car.shootCooldown > 0) {
         car.shootCooldown -= dt;
       } else {
@@ -107,7 +116,8 @@ CK.updateAI = function (dt) {
         if (gp > C.segmentLength * 1.5 && gp < C.segmentLength * 14 &&
             Math.abs(CK.player.x - car.offset) < 0.8) {
           CK.shootEgg(car);
-          car.shootCooldown = rand(2.5, 5);
+          // evil cars reload faster, so they pelt the player more relentlessly
+          car.shootCooldown = car.evil ? rand(1.2, 2.5) : rand(2.5, 5);
         }
       }
     }
@@ -124,7 +134,8 @@ CK.updateAI = function (dt) {
         if (gap > C.segmentLength * 0.6 && gap < C.segmentLength * 6 &&
             Math.abs(foeLat - car.offset) < 0.7) {
           CK.spawnEgg(car);
-          car.eggCooldown = rand(2.5, 5);
+          // evil cars drop defensive eggs more often too
+          car.eggCooldown = car.evil ? rand(1.2, 2.5) : rand(2.5, 5);
           break;
         }
       }
@@ -147,7 +158,9 @@ CK.updateAI = function (dt) {
     }
 
     car.speed = accelerate(car.speed, car.speed < topSpeed ? C.accel : C.decel * 0.5, dt);
-    car.speed = clamp(car.speed, 0, topSpeed);
+    // Ease toward the (possibly lowered) cap with momentum instead of snapping,
+    // so AI cars don't jolt to a stop on mud / 'slower' / egg-spin either.
+    car.speed = applyDragToCap(car.speed, topSpeed, dt);
 
     var startZ = car.z;
     car.z = increase(car.z, dt * car.speed, CK.trackLength);
@@ -161,6 +174,28 @@ CK.updateAI = function (dt) {
     }
 
     checkLapCrossing(car, startZ);
+
+    // The evil chicken (Diablo) can never trail the player by more than 25 feet.
+    // Done AFTER lap-crossing + segment re-bucketing to avoid false lap detection.
+    // Invisible because he's behind the camera. Sets car.lap explicitly so
+    // trackProgress stays consistent after the re-placement.
+    if (car.evil && CK.state === STATE.RACING && !car.finished && !CK.player.finished) {
+      var behindD = trackProgress(CK.player) - trackProgress(car); // > 0 = Diablo behind
+      if (behindD > C.diabloLeash) {
+        var targetProgress = Math.max(0, trackProgress(CK.player) - C.diabloLeash);
+        var prevSeg = findSegment(car.z);
+        car.lap = Math.floor(targetProgress / CK.trackLength);
+        car.z = targetProgress - car.lap * CK.trackLength;
+        car.percent = percentRemaining(car.z, C.segmentLength);
+        var leashSeg = findSegment(car.z);
+        if (prevSeg !== leashSeg) {
+          var pi = prevSeg.cars.indexOf(car);
+          if (pi >= 0) prevSeg.cars.splice(pi, 1);
+          leashSeg.cars.push(car);
+        }
+        car.speed = Math.max(car.speed, CK.player.speed);
+      }
+    }
   }
 };
 
