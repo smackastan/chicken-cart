@@ -62,6 +62,19 @@ var EGG_GRID = [
   "...OOOO..."
 ];
 
+// A small flying top hat — Cornelius's projectile. ~10px tall, egg-sized.
+// 'H' = hat black crown/brim, 'h' = hat band accent, 'O' = dark outline.
+var HAT_PROJECTILE_GRID = [
+  "...HHHH...",
+  "...HHHH...",
+  "...HHHH...",
+  "...HHHH...",
+  "...hhhh...",
+  "OHHHHHHHHO",
+  "OHHHHHHHHO",
+  "..OOOOOO.."
+];
+
 // Powerup boxes marked with what they do. 'B' = box body color, 'i' = white icon.
 // FASTER: up arrow.
 var BOX_FASTER_GRID = [
@@ -389,19 +402,15 @@ function makeDiabloAngry() {
   return makeSprite(diabloAngryGrid(), racerPalette('#3A0E10', true));
 }
 
-// The 10 named opponents, in fixed roster order. Each gets a distinct cart color
+// The 5 named opponents, in fixed roster order. Each gets a distinct cart color
 // (none is the player's cyan #19D3DA), an optional baked-on accessory, a render
-// scale, and an `evil` flag. ai.js copies name/scale/evil onto each AI car.
+// scale, an `evil` flag, and a per-car behavior flag. ai.js copies
+// name/scale/evil + the behavior flags onto each AI car.
 var RACER_SPECS = [
-  { name: 'Clucky',    color: '#E8413A', accessory: null,       scale: 1.0,  evil: false },
-  { name: 'Chicky',    color: '#F062A8', accessory: 'bow',      scale: 1.0,  evil: false },
-  { name: 'Cornelius', color: '#3A6B3A', accessory: 'hat',      scale: 1.0,  evil: false },
-  { name: 'Peewee',    color: '#F4C20D', accessory: null,       scale: 0.82, evil: false },
-  { name: 'BIG CARL',  color: '#FF8C42', accessory: null,       scale: 1.4,  evil: false },
-  { name: 'Gus',       color: '#2ECC71', accessory: null,       scale: 1.0,  evil: false },
-  { name: 'Rus',       color: '#9B59B6', accessory: null,       scale: 1.0,  evil: false },
-  { name: 'Anabelle',  color: '#E78BB0', accessory: null,       scale: 1.0,  evil: false },
-  { name: 'Bessy',     color: '#5DADE2', accessory: null,       scale: 1.0,  evil: false },
+  { name: 'Chicky',    color: '#F062A8', accessory: 'bow',      scale: 1.0,  evil: false, swerver: true },
+  { name: 'Cornelius', color: '#3A6B3A', accessory: 'hat',      scale: 1.0,  evil: false, throwsHats: true },
+  { name: 'Peewee',    color: '#F4C20D', accessory: null,       scale: 0.82, evil: false, jumper: true },
+  { name: 'BIG CARL',  color: '#FF8C42', accessory: null,       scale: 1.4,  evil: false, big: true },
   { name: 'Diablo',    color: '#3A0E10', accessory: 'mustache', scale: 1.0,  evil: true  }
 ];
 
@@ -412,12 +421,18 @@ CK.buildSprites = function () {
     return { straight: makeKart(c), left: makeKartTurn(c, -1), right: makeKartTurn(c, 1) };
   });
 
-  // named racers: straight + head-turn variants, with accessories baked in
+  // named racers: straight + head-turn variants, with accessories baked in.
+  // Behavior flags (swerver/throwsHats/jumper/big) ride along so ai.js can copy
+  // them onto each AI car.
   var racers = RACER_SPECS.map(function (spec) {
     return {
       name: spec.name,
       scale: spec.scale,
       evil: spec.evil,
+      swerver: !!spec.swerver,
+      throwsHats: !!spec.throwsHats,
+      jumper: !!spec.jumper,
+      big: !!spec.big,
       straight: makeRacerSprite(spec, spec.color, 0),
       left: makeRacerSprite(spec, spec.color, -1),
       right: makeRacerSprite(spec, spec.color, 1)
@@ -450,6 +465,7 @@ CK.buildSprites = function () {
     }),
     heart: makeSprite(HEART_GRID, { '.': null, 'H': '#FF3B6B' }),
     egg: makeSprite(EGG_GRID, { '.': null, 'O': '#1a1a1a', 'W': '#FFFFFF', 'h': '#CFEFFF' }),
+    hat: makeSprite(HAT_PROJECTILE_GRID, { '.': null, 'O': '#000000', 'H': '#101014', 'h': '#8a1212' }),
     boxes: {
       faster: makeSprite(BOX_FASTER_GRID, { '.': null, 'O': '#16461f', 'B': '#2ECC71', 'i': '#FFFFFF' }),
       invincible: makeSprite(BOX_INV_GRID, { '.': null, 'O': '#7a5c00', 'B': '#FFD23F', 'i': '#FFFFFF' }),

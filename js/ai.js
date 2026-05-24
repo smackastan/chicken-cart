@@ -54,11 +54,18 @@ CK.buildRacers = function () {
     car.name = car.spriteSet.name;
     car.scale = car.spriteSet.scale;
     car.evil = car.spriteSet.evil;
-    // Every chicken is 20% faster than the player's base top speed. Keep a small
-    // per-car variance (~±2%), the per-track aiMul as a secondary factor, and a
-    // tiny extra edge for the evil car (kept modest so they stay beatable).
-    car.baseMax = C.maxSpeed * 1.2 * rand(0.98, 1.02) * CK.tracks[CK.trackIndex].aiMul *
-                  (car.evil ? 1.04 : 1.0);
+    // per-car behavior flags from the roster
+    car.big = car.spriteSet.big;
+    car.throwsHats = car.spriteSet.throwsHats;
+    car.swerver = car.spriteSet.swerver;
+    car.jumper = car.spriteSet.jumper;
+    // jumper hop bookkeeping (Peewee hops ~once a second)
+    car.jumpCd = Math.random();
+    car.hopTimer = 0;
+    // Every chicken (Big Carl included) tops out at 125% of the player's base
+    // top speed — uniform across the field. The dynamic rubber-banding below
+    // still lets them surge or ease off to stay in the pack around you.
+    car.baseMax = C.maxSpeed * 1.25;
     car.sprite = car.spriteSet.straight;
     CK.cars.push(car);
     findSegment(car.z).cars.push(car);
@@ -88,8 +95,14 @@ CK.updateAI = function (dt) {
       target = clamp(target, -0.95, 0.95);
     }
 
-    car.offset += clamp(target - car.offset, -dt * 2.0, dt * 2.0);
-    car.offset = clamp(car.offset, -1.1, 1.1);
+    if (car.swerver) {
+      // Chicky weaves back and forth across the road continuously instead of
+      // tracking the racing line.
+      car.offset = Math.sin(CK.t * 3 + car.id) * 0.8;
+    } else {
+      car.offset += clamp(target - car.offset, -dt * 2.0, dt * 2.0);
+      car.offset = clamp(car.offset, -1.1, 1.1);
+    }
 
     // turn the head to look at the nearest racer alongside this one
     var look = 'straight', bestDz = C.segmentLength * 5;
@@ -106,9 +119,10 @@ CK.updateAI = function (dt) {
     car.look = look;
     car.sprite = car.spriteSet[look];
 
-    // Shoot eggs FORWARD at the player when they're ahead and roughly in line.
-    // Gated to forwardEggs tracks OR evil cars (who do it everywhere).
-    if (CK.tracks[CK.trackIndex].forwardEggs || car.evil) {
+    // Shoot projectiles FORWARD at the player when they're ahead and roughly in
+    // line. Gated to forwardEggs tracks OR evil cars OR hat-throwers (Cornelius,
+    // who pelts the player with hats on every track). items.js picks the sprite.
+    if (CK.tracks[CK.trackIndex].forwardEggs || car.evil || car.throwsHats) {
       if (car.shootCooldown > 0) {
         car.shootCooldown -= dt;
       } else {
@@ -116,10 +130,18 @@ CK.updateAI = function (dt) {
         if (gp > C.segmentLength * 1.5 && gp < C.segmentLength * 14 &&
             Math.abs(CK.player.x - car.offset) < 0.8) {
           CK.shootEgg(car);
-          // evil cars reload faster, so they pelt the player more relentlessly
+          // evil cars reload faster, so they pelt the player more relentlessly;
+          // hat-throwers use a normal shoot cooldown.
           car.shootCooldown = car.evil ? rand(1.2, 2.5) : rand(2.5, 5);
         }
       }
+    }
+
+    // Jumper (Peewee) hops about once a second; render.js lifts the sprite.
+    if (car.jumper) {
+      car.jumpCd -= dt;
+      if (car.jumpCd <= 0) { car.hopTimer = 0.5; car.jumpCd = 1.0; }
+      if (car.hopTimer > 0) car.hopTimer -= dt;
     }
 
     // drop an egg to defend when a racer is closing in just behind, on a similar line
@@ -149,6 +171,20 @@ CK.updateAI = function (dt) {
     else if (behind > C.segmentLength * 5) topSpeed *= 1.14;   // a bit behind -> push
     else if (behind < -C.segmentLength * 15) topSpeed *= 0.82; // far ahead -> ease off
     else if (behind < -C.segmentLength * 5) topSpeed *= 0.93;  // slightly ahead -> relax
+
+    // BIG CARL is erratic: he randomly SURGES forward, then suddenly SLAMS to a
+    // crawl — his speed jumps instantly at each switch so it reads as a lurch.
+    if (car.big) {
+      if (car.burstCd == null) { car.burstCd = rand(0.4, 1.2); car.bursting = false; }
+      car.burstCd -= dt;
+      if (car.burstCd <= 0) {
+        car.bursting = !car.bursting;
+        car.burstCd = car.bursting ? rand(0.5, 1.3) : rand(0.4, 1.0);
+        car.speed = car.bursting ? car.baseMax * 1.6 : C.maxSpeed * 0.28; // sudden jump
+      }
+      topSpeed = car.bursting ? car.baseMax * 1.6 : C.maxSpeed * 0.28;
+    }
+
     if (Math.abs(car.offset) > 1) topSpeed = Math.min(topSpeed, C.offRoadLimit * 1.5);
     if (car.mudTimer > 0) { topSpeed = Math.min(topSpeed, C.maxSpeed * 0.45); car.mudTimer -= dt; }
     if (car.spinTimer > 0) {
@@ -175,14 +211,14 @@ CK.updateAI = function (dt) {
 
     checkLapCrossing(car, startZ);
 
-    // The evil chicken (Diablo) can never trail the player by more than 25 feet.
-    // Done AFTER lap-crossing + segment re-bucketing to avoid false lap detection.
-    // Invisible because he's behind the camera. Sets car.lap explicitly so
-    // trackProgress stays consistent after the re-placement.
-    if (car.evil && CK.state === STATE.RACING && !car.finished && !CK.player.finished) {
-      var behindD = trackProgress(CK.player) - trackProgress(car); // > 0 = Diablo behind
-      if (behindD > C.diabloLeash) {
-        var targetProgress = Math.max(0, trackProgress(CK.player) - C.diabloLeash);
+    // No chicken can ever trail the player by more than 30 feet — they all stay
+    // glued to your tail. Done AFTER lap-crossing + segment re-bucketing to avoid
+    // false lap detection. Invisible because they're behind the camera. Sets
+    // car.lap explicitly so trackProgress stays consistent after re-placement.
+    if (CK.state === STATE.RACING && !car.finished && !CK.player.finished) {
+      var behindD = trackProgress(CK.player) - trackProgress(car); // > 0 = car behind
+      if (behindD > C.aiLeash) {
+        var targetProgress = Math.max(0, trackProgress(CK.player) - C.aiLeash);
         var prevSeg = findSegment(car.z);
         car.lap = Math.floor(targetProgress / CK.trackLength);
         car.z = targetProgress - car.lap * CK.trackLength;

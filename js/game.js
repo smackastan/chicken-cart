@@ -2,6 +2,34 @@
 // Game wiring: init, fixed-timestep loop, game states, restart.
 // ===========================================================================
 
+// Score persistence. localStorage can throw under some file:// contexts, so
+// every access is wrapped in try/catch and falls back gracefully.
+CK.SCORES_KEY = 'chickenCart.scores';
+CK.MAX_SCORES = 100;
+
+CK.loadScores = function () {
+  CK.scores = [];
+  try {
+    var raw = window.localStorage.getItem(CK.SCORES_KEY);
+    if (raw) {
+      var arr = JSON.parse(raw);
+      if (Object.prototype.toString.call(arr) === '[object Array]') {
+        CK.scores = arr.filter(function (n) { return typeof n === 'number' && isFinite(n); });
+      }
+    }
+  } catch (e) {
+    CK.scores = [];
+  }
+};
+
+CK.saveScores = function () {
+  try {
+    window.localStorage.setItem(CK.SCORES_KEY, JSON.stringify(CK.scores));
+  } catch (e) {
+    // ignore: persistence is best-effort
+  }
+};
+
 CK.init = function () {
   var canvas = document.getElementById('game');
   CK.canvas = canvas;
@@ -22,10 +50,12 @@ CK.init = function () {
 
   // feet -> world-units conversion from the speed scale, then Diablo's max leash:
   // he can never trail the player by more than 25 feet.
-  C.diabloLeash = 25 * (C.maxSpeed / (C.topSpeedMph * 5280 / 3600));
+  // Every chicken is leashed to stay within 30 feet behind the player.
+  C.aiLeash = 30 * (C.maxSpeed / (C.topSpeedMph * 5280 / 3600));
 
   CK.trackIndex = 0;
   CK.trophiesWon = [false, false, false]; // persists across the session
+  CK.loadScores();                        // past run scores from localStorage
   CK.buildSprites();
   CK.restart();
 
@@ -55,6 +85,7 @@ CK.restart = function () {
   CK.buildRacers();
 
   CK.awarded = false;
+  CK.lastScore = null;   // cleared until this race finishes (HUD highlight)
   CK.outcome = null;
   CK.cutsceneStart = 0;
   CK.state = STATE.INTRO;
@@ -95,6 +126,15 @@ CK.update = function (dt) {
     if (CK.player.finished && !CK.awarded) {
       CK.awarded = true;
       if (CK.player.position === 1) CK.trophiesWon[CK.trackIndex] = true;
+
+      // Persist this run's score (once per race, guarded by !CK.awarded above).
+      // Keep CK.scores sorted DESC and capped, and remember it for the HUD.
+      CK.lastScore = CK.player.score;
+      if (!CK.scores) CK.scores = [];
+      CK.scores.push(CK.player.score);
+      CK.scores.sort(function (a, b) { return b - a; });
+      if (CK.scores.length > CK.MAX_SCORES) CK.scores.length = CK.MAX_SCORES;
+      CK.saveScores();
 
       // Determine the results-screen outcome (positions are fresh here) and
       // capture the moment of finishing for hud.js cutscenes.

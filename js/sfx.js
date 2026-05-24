@@ -4,6 +4,7 @@
 // Chiptune / 8-bit driving effects, driven each frame by input + speed:
 //   1. a tire SCREECH on the rising edge of brake (and a held-brake retrigger)
 //   2. a tire CHIRP on the rising edge of steer left/right
+//   2b. a repeating CRUNCH while riding off the track on the grass (|x| > 1)
 // plus two one-shot impact effects fired by gameplay (items.js):
 //   3. SMASH! - a punchy collision crunch (car/chicken hit)
 //   4. squish - a wet splat (pothole/mud hit)
@@ -39,13 +40,21 @@ CK.carSfx = CK.carSfx || {};
   var TURN_GAIN        = 0.09;       // screech volume (intentionally low/subtle)
   var TURN_COOLDOWN    = 0.45;       // debounce so direction changes don't spam (s)
 
+  var OFFROAD_SPEED_MIN = 0.08;      // need a little speed to crunch on the grass
+  var OFFROAD_FREQ_LO   = 450;       // crunch noise band (Hz) — randomized per hit
+  var OFFROAD_FREQ_HI   = 950;       // so it sounds gritty, not tonal
+  var OFFROAD_DUR       = 0.08;      // each crunch burst length (s)
+  var OFFROAD_Q         = 1.6;       // grungy resonance
+  var OFFROAD_GAIN      = 0.15;      // crunch volume
+
   // ---- Internal state ------------------------------------------------------
   // previous-frame key snapshot for rising-edge detection
   var prev = { up: false, down: false, left: false, right: false };
 
   // cooldown timestamps (audio-clock seconds) so a held key doesn't spam
-  var lastBrakeAt = -1e9;
-  var lastTurnAt  = -1e9;
+  var lastBrakeAt  = -1e9;
+  var lastTurnAt   = -1e9;
+  var lastCrunchAt = -1e9;
 
   // -- Tire screech (braking) ------------------------------------------------
   function screech(now) {
@@ -83,6 +92,26 @@ CK.carSfx = CK.carSfx || {};
     lastTurnAt = now;
   }
 
+  // -- Off-road crunch (riding on the grass) ---------------------------------
+  // A short gravelly noise burst; the trigger logic repeats it so it reads as a
+  // continuous crunch. Randomized band keeps each crunch gritty, not tonal.
+  function crunch(now) {
+    try {
+      var f = OFFROAD_FREQ_LO + Math.random() * (OFFROAD_FREQ_HI - OFFROAD_FREQ_LO);
+      CK.sound.noise({
+        start:   now,
+        dur:     OFFROAD_DUR,
+        type:    'bandpass',
+        freq:    f,
+        sweepTo: f * 0.6,   // a touch of downward grit
+        q:       OFFROAD_Q,
+        gain:    OFFROAD_GAIN,
+        attack:  0.002
+      });
+    } catch (e) {}
+    lastCrunchAt = now;
+  }
+
   // -- Edge/trigger handling: brake screech + turn chirp ---------------------
   function updateTriggers(now) {
     var k = CK.keys || prev;
@@ -107,6 +136,15 @@ CK.carSfx = CK.carSfx || {};
       var turnEdge = !steerPrev;             // started steering this frame
       var turnRepeat = (now - lastTurnAt) >= TURN_COOLDOWN;
       if (turnEdge || turnRepeat) chirp(now);
+    }
+
+    // Off-road: a repeating gravelly CRUNCH while riding on the grass (|x| > 1),
+    // unless airborne (jumping clears it). Crunches faster the faster you go.
+    var offRoad = Math.abs(p.x || 0) > 1;
+    var airborne = (p.jumpTimer || 0) > 0;
+    if (racing && offRoad && !airborne && pct > OFFROAD_SPEED_MIN) {
+      var interval = clamp(0.16 - pct * 0.10, 0.05, 0.16);
+      if ((now - lastCrunchAt) >= interval) crunch(now);
     }
   }
 

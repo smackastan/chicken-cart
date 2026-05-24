@@ -52,7 +52,7 @@ CK.C = {
   topSpeedMph: 84,      // speedometer reading at full base speed (70 * speedScale)
 
   totalLaps: 3,
-  aiCount: 10,
+  aiCount: 5,
 
   trackLengthMul: 2     // every track is built twice as long (same shape)
 };

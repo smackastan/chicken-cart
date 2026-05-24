@@ -6,6 +6,14 @@ CK.keys = { up: false, down: false, left: false, right: false };
 CK.showControls = false;
 
 window.addEventListener('keydown', function (e) {
+  // From the title screen, any key starts the game (skips the rest of the intro).
+  // Let browser shortcuts (Ctrl/Cmd/Alt combos like reload) pass through.
+  if (CK.state === STATE.INTRO) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    CK.introTimer = 0;
+    if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
+    return;
+  }
   switch (e.code) {
     case 'KeyW': CK.keys.up = true; break;
     case 'KeyS': CK.keys.down = true; break;

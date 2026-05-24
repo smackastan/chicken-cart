@@ -224,8 +224,14 @@ function renderMirror(ctx) {
     var spread = (mw * 0.46) * (1 - 0.55 * t);
     var x = mx + mw / 2 - c.offset * spread;        // x-flip: mirror the lateral offset
     var w = mSprite.w * sc, h = mSprite.h * sc;
+    // Jumper (Peewee) hops in the mirror too.
+    var mLift = 0;
+    if (c.hopTimer > 0) {
+      var mpr = 1 - c.hopTimer / 0.5;
+      mLift = Math.sin(mpr * Math.PI) * h * 0.6;
+    }
     ctx.drawImage(mSprite.img, 0, 0, mSprite.w, mSprite.h,
-      x - w / 2, baseY - h, w, h);
+      x - w / 2, baseY - h - mLift, w, h);
     if (mAngry) drawSmoke(ctx, x, baseY - h, sc, c.z || j);  // clipped to mirror rect
   }
 
@@ -315,7 +321,15 @@ CK.render = function () {
       var angry = car.evil && car.angryTimer > 0;
       if (angry && CK.sprites && CK.sprites.diabloAngry) drawSprite = CK.sprites.diabloAngry;
       var drawScale = car.isEgg ? cs * 1.6 : cs * carScale;
-      renderSprite(ctx, drawSprite, drawScale, cx, cy, -0.5, -1, segment.clip);
+      // Jumper (Peewee) hops: lift the sprite along a sine arc for the hop window.
+      var drawCy = cy;
+      if (car.hopTimer > 0) {
+        var hopSpriteH = drawSprite.h * drawScale * (C.width / 2) * C.spriteScale * C.roadWidth;
+        var pr = 1 - car.hopTimer / 0.5;
+        var lift = Math.sin(pr * Math.PI) * hopSpriteH * 0.6;
+        drawCy = cy - lift;
+      }
+      renderSprite(ctx, drawSprite, drawScale, cx, drawCy, -0.5, -1, segment.clip);
       if (angry) {
         // top of the drawn sprite on screen (sprite is bottom-anchored at cy)
         var onScreenH = drawSprite.h * drawScale * (C.width / 2) * C.spriteScale * C.roadWidth;

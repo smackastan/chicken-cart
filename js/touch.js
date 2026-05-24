@@ -49,4 +49,10 @@ CK.isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
       if (CK.state === STATE.FINISHED) { e.preventDefault(); CK.nextRace(); }
     }, { passive: false });
   }
+
+  // From the title screen, any tap (anywhere, including the on-screen buttons)
+  // starts the game.
+  window.addEventListener('touchstart', function () {
+    if (CK.state === STATE.INTRO) CK.introTimer = 0;
+  }, { passive: true });
 })();

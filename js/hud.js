@@ -91,6 +91,17 @@ CK.hud = {
     alpha = clamp(alpha, 0, 1);
 
     this.renderFlameTitle(ctx, C.width / 2, C.height * 0.34, alpha);
+
+    // Blinking "press any key / tap to start" prompt — any input begins the race.
+    if (Math.floor(CK.t * 1.6) % 2) {
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(CK.isTouch ? 'TAP TO START' : 'PRESS ANY KEY TO START',
+                   C.width / 2, C.height * 0.64);
+    }
+
     this.renderStartHint(ctx); // controls shown at the beginning (stay readable)
   },
 
@@ -405,6 +416,7 @@ CK.hud = {
   renderResults: function (ctx) {
     var C = CK.C, p = CK.player;
     var metalColor = { bronze: '#CD7F32', silver: '#D8D8D8', gold: '#FFD23F' };
+    var highlighted = false; // ensures only one leaderboard row gets the "you" marker
 
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     ctx.fillRect(0, 0, C.width, C.height);
@@ -435,6 +447,37 @@ CK.hud = {
     ctx.fillStyle = '#9CF0FF';
     ctx.font = 'bold 22px monospace';
     ctx.fillText('Score: ' + p.score, lx, y + 16);
+
+    // TOP 10 leaderboard (center column, in the space freed by the short roster).
+    // Sits between the left standings and the trophy (~0.72 width), above the
+    // trophy shelf (C.height-118) and the "press ENTER" line at the bottom.
+    var scores = CK.scores || [];
+    var topX = C.width * 0.40;            // center-left column
+    var topY = 124;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#FFD23F';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText('TOP 10 SCORES', topX, topY);
+
+    ctx.font = '20px monospace';
+    var rowY = topY + 34;
+    for (var s = 0; s < 10; s++) {
+      var label = (s + 1) + '.';
+      // pad rank label to a fixed width so the score column lines up
+      while (label.length < 4) label += ' ';
+      if (s < scores.length) {
+        var val = scores[s];
+        // highlight the row that matches this run's score (first match only)
+        var isYou = (CK.lastScore != null && val === CK.lastScore && !highlighted);
+        if (isYou) highlighted = true;
+        ctx.fillStyle = isYou ? '#FFD23F' : '#9CF0FF';
+        ctx.fillText(label + ' ' + val + (isYou ? '   ◄ you' : ''), topX, rowY);
+      } else {
+        ctx.fillStyle = '#555';
+        ctx.fillText(label + ' --', topX, rowY);
+      }
+      rowY += 26;
+    }
 
     // trophy (right side)
     var metal = CK.tracks[CK.trackIndex].trophy;

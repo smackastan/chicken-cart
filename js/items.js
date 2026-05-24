@@ -71,7 +71,9 @@ CK.spawnEgg = function (owner) {
     life: 12,
     dropperProgress: trackProgress(owner),
     owner: owner,
-    sprite: CK.sprites.egg,
+    // hat-throwers (Cornelius) fling top hats; everyone else lays eggs. Hats spin
+    // out racers exactly like eggs (isEgg stays true).
+    sprite: (owner && owner.throwsHats && CK.sprites.hat) ? CK.sprites.hat : CK.sprites.egg,
     percent: percentRemaining(z, C.segmentLength),
     isEgg: true,
     dead: false
@@ -94,7 +96,9 @@ CK.shootEgg = function (owner) {
     forward: true,
     vz: C.maxSpeed * 1.25,
     dropperProgress: trackProgress(owner),
-    sprite: CK.sprites.egg,
+    // hat-throwers (Cornelius) shoot top hats; everyone else shoots eggs. Hats
+    // spin out racers exactly like eggs (isEgg stays true).
+    sprite: (owner && owner.throwsHats && CK.sprites.hat) ? CK.sprites.hat : CK.sprites.egg,
     percent: percentRemaining(z, C.segmentLength),
     isEgg: true,
     dead: false
