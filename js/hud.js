@@ -31,11 +31,11 @@ CK.hud = {
       ctx.fillText(p.powerup.toUpperCase() + '  ' + p.powerupTimer.toFixed(1) + 's', C.width / 2, 12);
     }
 
-    // speedometer
+    // speedometer (base speed reads as ~70 mph; boosts push it higher)
     ctx.textAlign = 'left';
     ctx.fillStyle = '#fff';
-    var kph = Math.round(p.speed / C.maxSpeed * 180);
-    ctx.fillText(kph + ' km/h', 16, C.height - 36);
+    var mph = Math.round(p.speed / C.maxSpeed * C.topSpeedMph);
+    ctx.fillText(mph + ' mph', 16, C.height - 36);
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.strokeRect(150, C.height - 34, 160, 16);
@@ -62,10 +62,85 @@ CK.hud = {
       }
     }
 
-    if (CK.state === STATE.COUNTDOWN) this.renderCountdown(ctx);
+    if (CK.state === STATE.INTRO) this.renderIntro(ctx);
+    else if (CK.state === STATE.COUNTDOWN) this.renderCountdown(ctx);
     else if (CK.state === STATE.FINISHED) this.renderResults(ctx);
 
     if (CK.showControls) this.renderControls(ctx);
+  },
+
+  // Opening title: "CHICKEN CART" in flaming letters, holding for introDuration
+  // seconds and fading out right before the countdown begins.
+  renderIntro: function (ctx) {
+    var C = CK.C;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, C.width, C.height);
+
+    var t = CK.introTimer, elapsed = C.introDuration - t;
+    var alpha = 1;
+    if (elapsed < 1.2) alpha = elapsed / 1.2;      // fade in
+    if (t < 1.5) alpha = Math.min(alpha, t / 1.5); // fade away just before GO
+    alpha = clamp(alpha, 0, 1);
+
+    this.renderFlameTitle(ctx, C.width / 2, C.height * 0.34, alpha);
+    this.renderStartHint(ctx); // controls shown at the beginning (stay readable)
+  },
+
+  // Warm gradient fill + flickering orange glow + gentle sway = "flaming" text.
+  renderFlameTitle: function (ctx, cx, cy, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 92px monospace';
+
+    var words = ['CHICKEN', 'CART'];
+    for (var i = 0; i < words.length; i++) {
+      var y = cy + i * 96;
+      var wob = Math.sin(CK.t * 9 + i * 2) * 3;
+      var grad = ctx.createLinearGradient(0, y - 52, 0, y + 52);
+      grad.addColorStop(0,    '#fff6c0');
+      grad.addColorStop(0.35, '#ffd23f');
+      grad.addColorStop(0.7,  '#ff7a18');
+      grad.addColorStop(1,    '#c50f06');
+      ctx.fillStyle = grad;
+      ctx.shadowColor = 'rgba(255,110,0,0.95)';
+      ctx.shadowBlur = 28 + 10 * Math.sin(CK.t * 16 + i); // flicker
+      ctx.fillText(words[i], cx, y + wob);
+      ctx.shadowBlur = 12;                                 // second pass = hotter bloom
+      ctx.fillText(words[i], cx, y + wob);
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  },
+
+  // Track name + a control reference, adapting to keyboard or touch.
+  renderStartHint: function (ctx) {
+    var C = CK.C;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillText('TRACK ' + (CK.trackIndex + 1) + '/' + CK.tracks.length + ' — ' +
+                 CK.tracks[CK.trackIndex].name, C.width / 2, C.height - 118);
+
+    ctx.fillStyle = '#FFD23F';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('CONTROLS', C.width / 2, C.height - 86);
+
+    ctx.fillStyle = '#eee';
+    ctx.font = '17px monospace';
+    if (CK.isTouch) {
+      ctx.fillText('GAS · BRAKE · ◀ ▶ steer · JUMP (clears mud) · EGG',
+                   C.width / 2, C.height - 58);
+      ctx.fillText('hold the on-screen buttons to steer & accelerate',
+                   C.width / 2, C.height - 34);
+    } else {
+      ctx.fillText('W gas   S brake   A / D steer   SPACE jump   E drop egg',
+                   C.width / 2, C.height - 58);
+      ctx.fillText('press TAB anytime to see full controls', C.width / 2, C.height - 34);
+    }
   },
 
   renderControls: function (ctx) {
@@ -84,7 +159,14 @@ CK.hud = {
     ctx.font = 'bold 30px monospace';
     ctx.fillText('CONTROLS', C.width / 2, py + 22);
 
-    var rows = [
+    var rows = CK.isTouch ? [
+      ['GAS', 'accelerate'],
+      ['BRAKE', 'brake'],
+      ['◀ ▶', 'steer left / right'],
+      ['JUMP', 'jump (clears mud)'],
+      ['EGG', 'drop egg'],
+      ['TAP', 'next track (on results)']
+    ] : [
       ['W', 'accelerate'],
       ['S', 'brake'],
       ['A / D', 'steer left / right'],
@@ -137,9 +219,15 @@ CK.hud = {
     ctx.textBaseline = 'top';
     ctx.font = '18px monospace';
     ctx.fillStyle = '#eee';
-    ctx.fillText('W gas   S brake   A / D steer   SPACE jump   E drop egg', C.width / 2, C.height - 70);
-    ctx.fillStyle = '#FFD23F';
-    ctx.fillText('press TAB anytime to see controls', C.width / 2, C.height - 44);
+    if (CK.isTouch) {
+      ctx.fillText('GAS · BRAKE · ◀ ▶ steer · JUMP · EGG', C.width / 2, C.height - 70);
+      ctx.fillStyle = '#FFD23F';
+      ctx.fillText('use the on-screen buttons', C.width / 2, C.height - 44);
+    } else {
+      ctx.fillText('W gas   S brake   A / D steer   SPACE jump   E drop egg', C.width / 2, C.height - 70);
+      ctx.fillStyle = '#FFD23F';
+      ctx.fillText('press TAB anytime to see controls', C.width / 2, C.height - 44);
+    }
   },
 
   renderResults: function (ctx) {
@@ -214,6 +302,7 @@ CK.hud = {
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 20px monospace';
     var nextName = CK.tracks[(CK.trackIndex + 1) % CK.tracks.length].name;
-    ctx.fillText('Press ENTER for next track: ' + nextName, C.width / 2, C.height - 18);
+    ctx.fillText((CK.isTouch ? 'Tap the screen' : 'Press ENTER') + ' for next track: ' + nextName,
+      C.width / 2, C.height - 18);
   }
 };

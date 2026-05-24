@@ -7,6 +7,7 @@ var CK = {};
 
 // Game states
 var STATE = {
+  INTRO: 'intro',        // flaming title screen before the countdown
   COUNTDOWN: 'countdown',
   RACING: 'racing',
   FINISHED: 'finished'
@@ -43,6 +44,9 @@ CK.C = {
   jumpDuration: 0.65,   // seconds airborne after a hop
   jumpRecharge: 0.35,   // cooldown before you can jump again
 
+  introDuration: 10,    // seconds of flaming title before the countdown
+  topSpeedMph: 70,      // speedometer reading at full base speed
+
   totalLaps: 3,
-  aiCount: 5
+  aiCount: 10
 };

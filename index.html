@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Chicken Cart</title>
   <style>
     html, body {
@@ -11,6 +11,9 @@
       background: #000;
       overflow: hidden;
       font-family: monospace;
+      touch-action: none;          /* stop the browser hijacking taps/swipes as scroll/zoom */
+      -webkit-user-select: none;
+      user-select: none;
     }
     #wrap {
       width: 100%;
@@ -30,12 +33,80 @@
       background: #72D7EE;
       box-shadow: 0 0 40px rgba(0,0,0,0.6);
     }
+
+    /* ---- Touch controls (hidden until touch.js adds `touch` to <body>) ---- */
+    #touch-controls { display: none; }
+    body.touch #touch-controls {
+      display: block;
+      position: fixed;
+      inset: 0;
+      pointer-events: none;        /* only the buttons themselves are tappable */
+      z-index: 10;
+    }
+    .tc-cluster {
+      position: absolute;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      display: grid;
+      gap: 14px;
+    }
+    .tc-left  { left: max(18px, env(safe-area-inset-left)); grid-template-columns: repeat(2, auto); }
+    .tc-right { right: max(18px, env(safe-area-inset-right)); grid-template-columns: repeat(2, auto); }
+    .tc-btn {
+      pointer-events: auto;
+      width: 84px; height: 84px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.85);
+      background: rgba(0,0,0,0.38);
+      color: #fff;
+      font: bold 15px monospace;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tc-btn.pressed { background: rgba(255,255,255,0.45); transform: scale(0.94); }
+    .tc-btn.tc-gas   { background: rgba(46,204,113,0.45); border-color: #3df59a; font-size: 17px; }
+    .tc-btn.tc-brake { background: rgba(231,76,60,0.40); border-color: #ff7a7a; }
+    .tc-btn.tc-small { width: 68px; height: 68px; font-size: 13px; align-self: center; }
+
+    /* Landscape is the playable orientation; nudge portrait players to rotate. */
+    #rotate-hint { display: none; }
+    @media (orientation: portrait) {
+      body.touch #touch-controls { display: none; }
+      body.touch #rotate-hint {
+        display: flex;
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 24px;
+        background: #000;
+        color: #FFD23F;
+        font: bold 22px monospace;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="wrap">
     <canvas id="game" width="1024" height="576"></canvas>
   </div>
+
+  <!-- On-screen controls for touch devices (revealed by touch.js) -->
+  <div id="touch-controls">
+    <div class="tc-cluster tc-left">
+      <button id="btn-left" class="tc-btn" aria-label="steer left">◀</button>
+      <button id="btn-right" class="tc-btn" aria-label="steer right">▶</button>
+    </div>
+    <div class="tc-cluster tc-right">
+      <button id="btn-egg" class="tc-btn tc-small" aria-label="drop egg">EGG</button>
+      <button id="btn-jump" class="tc-btn tc-small" aria-label="jump">JUMP</button>
+      <button id="btn-brake" class="tc-btn tc-brake" aria-label="brake">BRAKE</button>
+      <button id="btn-gas" class="tc-btn tc-gas" aria-label="accelerate">GAS</button>
+    </div>
+  </div>
+
+  <div id="rotate-hint">↻ Rotate your device to landscape to play</div>
 
   <!-- load order matters: plain scripts, no modules (so it runs from file://) -->
   <script src="js/globals.js"></script>
@@ -49,6 +120,7 @@
   <script src="js/render.js"></script>
   <script src="js/hud.js"></script>
   <script src="js/input.js"></script>
+  <script src="js/touch.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

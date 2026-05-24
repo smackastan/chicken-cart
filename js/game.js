@@ -49,7 +49,8 @@ CK.restart = function () {
   CK.buildRacers();
 
   CK.awarded = false;
-  CK.state = STATE.COUNTDOWN;
+  CK.state = STATE.INTRO;
+  CK.introTimer = CK.C.introDuration;
   CK.countdown = 3.0;
 };
 
@@ -66,6 +67,11 @@ CK.nextRace = function () {
 var STEP = 1 / 60;
 
 CK.update = function (dt) {
+  if (CK.state === STATE.INTRO) {
+    CK.introTimer -= dt;
+    if (CK.introTimer <= 0) CK.state = STATE.COUNTDOWN;
+    return;
+  }
   if (CK.state === STATE.COUNTDOWN) {
     CK.countdown -= dt;
     if (CK.countdown <= -0.8) CK.state = STATE.RACING;
