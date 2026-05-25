@@ -95,6 +95,9 @@ CK.updateAI = function (dt) {
       target = clamp(target, -0.95, 0.95);
     }
 
+    // Big Carl homes in on the player's lateral position — he steers straight at you.
+    if (car.big) target = clamp(CK.player.x, -1.05, 1.05);
+
     if (car.swerver) {
       // Chicky weaves back and forth across the road continuously instead of
       // tracking the racing line.
@@ -138,10 +141,20 @@ CK.updateAI = function (dt) {
     }
 
     // Jumper (Peewee) hops about once a second; render.js lifts the sprite.
+    // Also randomly bursts to ~160% speed for ~25% of the time.
     if (car.jumper) {
       car.jumpCd -= dt;
       if (car.jumpCd <= 0) { car.hopTimer = 0.5; car.jumpCd = 1.0; }
       if (car.hopTimer > 0) car.hopTimer -= dt;
+
+      // Lazy-init fast-burst state.
+      if (car.fastCd == null) { car.fastCd = rand(0.5, 1.2); car.peeFast = false; }
+      // Re-roll every ~1 s window; 25% chance to be in "fast" mode each window.
+      car.fastCd -= dt;
+      if (car.fastCd <= 0) {
+        car.peeFast = (Math.random() < 0.25);
+        car.fastCd = rand(0.8, 1.4);
+      }
     }
 
     // drop an egg to defend when a racer is closing in just behind, on a similar line
@@ -172,18 +185,8 @@ CK.updateAI = function (dt) {
     else if (behind < -C.segmentLength * 15) topSpeed *= 0.82; // far ahead -> ease off
     else if (behind < -C.segmentLength * 5) topSpeed *= 0.93;  // slightly ahead -> relax
 
-    // BIG CARL is erratic: he randomly SURGES forward, then suddenly SLAMS to a
-    // crawl — his speed jumps instantly at each switch so it reads as a lurch.
-    if (car.big) {
-      if (car.burstCd == null) { car.burstCd = rand(0.4, 1.2); car.bursting = false; }
-      car.burstCd -= dt;
-      if (car.burstCd <= 0) {
-        car.bursting = !car.bursting;
-        car.burstCd = car.bursting ? rand(0.5, 1.3) : rand(0.4, 1.0);
-        car.speed = car.bursting ? car.baseMax * 1.6 : C.maxSpeed * 0.28; // sudden jump
-      }
-      topSpeed = car.bursting ? car.baseMax * 1.6 : C.maxSpeed * 0.28;
-    }
+    // Peewee random speed burst: active ~25% of the time, surges to 160% baseMax.
+    if (car.jumper && car.peeFast) topSpeed = Math.max(topSpeed, car.baseMax * 1.6);
 
     if (Math.abs(car.offset) > 1) topSpeed = Math.min(topSpeed, C.offRoadLimit * 1.5);
     if (car.mudTimer > 0) { topSpeed = Math.min(topSpeed, C.maxSpeed * 0.45); car.mudTimer -= dt; }

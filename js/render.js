@@ -215,10 +215,10 @@ function renderMirror(ctx) {
     var c = behind[j].c, d = behind[j].d;
     var t = d / maxDist;                            // 0 near .. 1 far
     var baseY = lerp(my + mh * 0.97, my + mh * 0.45, t);
-    // When the player has hit Diablo, show his raised-fist sprite + smoke here —
-    // this mirror is where the player usually sees him (leashed ~25ft behind).
-    var mAngry = c.evil && c.angryTimer > 0;
-    var mSprite = (mAngry && CK.sprites && CK.sprites.diabloAngry) ? CK.sprites.diabloAngry : c.sprite;
+    // Any car with angryTimer > 0 smokes; only the evil car (Diablo) gets the fist sprite.
+    var mAngry = c.angryTimer > 0;
+    var mEvilAngry = c.evil && mAngry;
+    var mSprite = (mEvilAngry && CK.sprites && CK.sprites.diabloAngry) ? CK.sprites.diabloAngry : c.sprite;
     var sc = (mh * 0.62 / mSprite.h) * (1 - 0.78 * t);
     if (sc <= 0) continue;
     var spread = (mw * 0.46) * (1 - 0.55 * t);
@@ -232,7 +232,27 @@ function renderMirror(ctx) {
     }
     ctx.drawImage(mSprite.img, 0, 0, mSprite.w, mSprite.h,
       x - w / 2, baseY - h - mLift, w, h);
-    if (mAngry) drawSmoke(ctx, x, baseY - h, sc, c.z || j);  // clipped to mirror rect
+    if (mAngry) drawSmoke(ctx, x, baseY - h - mLift, sc, c.z || j);  // clipped to mirror rect
+  }
+
+  // Draw eggs that are BEHIND the player in the mirror, using the same mapping.
+  if (CK.eggs) {
+    for (var ei = 0; ei < CK.eggs.length; ei++) {
+      var egg = CK.eggs[ei];
+      if (!egg || !egg.sprite || !egg.sprite.img) continue;
+      var ed = forwardGap(CK.player.z, egg.z);
+      if (ed <= 0 || ed > maxDist) continue;
+      var et = ed / maxDist;
+      var eBaseY = lerp(my + mh * 0.97, my + mh * 0.45, et);
+      var eSc = (mh * 0.62 / egg.sprite.h) * (1 - 0.78 * et);
+      if (eSc <= 0) continue;
+      var eSpread = (mw * 0.46) * (1 - 0.55 * et);
+      var ex = mx + mw / 2 - egg.offset * eSpread;
+      var ew = egg.sprite.w * eSc, eh2 = egg.sprite.h * eSc;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(egg.sprite.img, 0, 0, egg.sprite.w, egg.sprite.h,
+        ex - ew / 2, eBaseY - eh2, ew, eh2);
+    }
   }
 
   ctx.restore();
@@ -317,9 +337,11 @@ CK.render = function () {
       // eggs render 1.6x so they're easy to spot; racers scale per chicken (BIG CARL big, Peewee small)
       var carScale = car.scale || 1;
       // When the player has hit Diablo, he raises his fist and pours smoke.
+      // Any angry car smokes; only the evil car (Diablo) gets the fist sprite.
       var drawSprite = car.sprite;
-      var angry = car.evil && car.angryTimer > 0;
-      if (angry && CK.sprites && CK.sprites.diabloAngry) drawSprite = CK.sprites.diabloAngry;
+      var angry = car.angryTimer > 0;
+      var evilAngry = car.evil && angry;
+      if (evilAngry && CK.sprites && CK.sprites.diabloAngry) drawSprite = CK.sprites.diabloAngry;
       var drawScale = car.isEgg ? cs * 1.6 : cs * carScale;
       // Jumper (Peewee) hops: lift the sprite along a sine arc for the hop window.
       var drawCy = cy;

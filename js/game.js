@@ -87,6 +87,7 @@ CK.restart = function () {
   CK.awarded = false;
   CK.lastScore = null;   // cleared until this race finishes (HUD highlight)
   CK.outcome = null;
+  CK.winner = null;
   CK.cutsceneStart = 0;
   CK.state = STATE.INTRO;
   CK.introTimer = CK.C.introDuration;
@@ -137,13 +138,10 @@ CK.update = function (dt) {
       CK.saveScores();
 
       // Determine the results-screen outcome (positions are fresh here) and
-      // capture the moment of finishing for hud.js cutscenes.
-      var diablo = null;
-      for (var d = 0; d < CK.cars.length; d++) {
-        if (CK.cars[d].evil) { diablo = CK.cars[d]; break; }
-      }
-      CK.outcome = (CK.player.position === 1) ? 'win' :
-                   ((diablo && diablo.position < CK.player.position) ? 'loseToDiablo' : 'normal');
+      // capture the moment of finishing for hud.js cutscenes. On a loss,
+      // CK.racers[0] is the winning AI chicken (racers are sorted by standing).
+      CK.outcome = (CK.player.position === 1) ? 'win' : 'lose';
+      CK.winner = (CK.player.position === 1) ? null : CK.racers[0];
       CK.cutsceneStart = CK.t;
     }
   }

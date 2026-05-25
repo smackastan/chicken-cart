@@ -68,7 +68,7 @@ CK.hud = {
     else if (CK.state === STATE.COUNTDOWN) this.renderCountdown(ctx);
     else if (CK.state === STATE.FINISHED) {
       // play a short cutscene first (win / heartbreak), then the normal results.
-      var cs = (CK.outcome === 'win' || CK.outcome === 'loseToDiablo') &&
+      var cs = (CK.outcome === 'win' || CK.outcome === 'lose') &&
                (CK.t - (CK.cutsceneStart || 0)) < 3.5;
       if (cs) this.renderCutscene(ctx);
       else this.renderResults(ctx);
@@ -251,13 +251,16 @@ CK.hud = {
 
   // Short (~3.5s) story beat after the player finishes, before the standings.
   // WIN: the girlfriend walks in and hands you the trophy amid floating hearts.
-  // LOSE-TO-DIABLO: Diablo rushes in, grabs your girl, and drags her off-screen.
+  // LOSE: the chicken that WON the race takes your girl, with per-winner flair
+  //   (Big Carl carries her off, Cornelius tips his hat, Chicky goes shoe
+  //   shopping, Diablo drags her off, others lead her away). Branches on
+  //   CK.winner's behavior flags.
   // Driven entirely by t = seconds into the clip.
   renderCutscene: function (ctx) {
     var C = CK.C;
     // guard: if the data contract isn't satisfied, fall back to results.
     if (CK.cutsceneStart == null ||
-        (CK.outcome !== 'win' && CK.outcome !== 'loseToDiablo')) {
+        (CK.outcome !== 'win' && CK.outcome !== 'lose')) {
       this.renderResults(ctx);
       return;
     }
@@ -348,66 +351,212 @@ CK.hud = {
         ctx.fillText('She gives you the ' + trophyKey + ' rooster!', C.width / 2, C.height - 56);
       }
     } else {
-      // ---- LOSE TO DIABLO: heartbreak ----
-      var g2 = ctx.createLinearGradient(0, 0, 0, C.height);
-      g2.addColorStop(0, '#2a0d12');
-      g2.addColorStop(1, '#0a0406');
-      ctx.fillStyle = g2;
-      ctx.fillRect(0, 0, C.width, C.height);
+      // ---- LOSE: the winning chicken takes your girl (per-winner flair) ----
+      var winner = CK.winner; // null only if the contract broke; guarded below
+      var winnerSpr = winner && winner.spriteSet && winner.spriteSet.straight;
+      var winnerScale = (winner && winner.scale) ? winner.scale : 1;
 
-      var pScale2 = 7, gScale2 = 7, dScale = 7;
-      var playerX2 = C.width * 0.30;
-      var playerY2 = ground - player.h * pScale2 / 2;
-      drawSpr(player, playerX2, playerY2, pScale2);
-
-      // Diablo: rushes in from the right, grabs the girl mid-clip, then both
-      // slide off to the LEFT and exit.
-      var diablo = (CK.sprites.racers && CK.sprites.racers.find &&
-                    CK.sprites.racers.find(function (r) { return r.evil; })) ||
-                   (CK.sprites.racers && CK.sprites.racers[9]);
-      var diabloSpr = diablo && diablo.straight;
-
-      // girl starts beside the player on the right of him
-      var girlStart = C.width * 0.52;
-      var grabT = 1.4;   // moment Diablo reaches her
-      var diabloInX = lerp(C.width + 140, girlStart + 70, easeOut(t / grabT));
-      var girlX2, diabloX;
-      if (t < grabT) {
-        // phase 1: Diablo charges in toward the girl (she waits, trembling)
-        girlX2 = girlStart + Math.sin(t * 30) * 2;
-        diabloX = diabloInX;
-      } else {
-        // phase 2: grabbed — both slide off the LEFT edge together
-        var off = easeIn((t - grabT) / (3.5 - grabT));
-        diabloX = lerp(girlStart + 70, -160, off);
-        girlX2 = diabloX - 70; // girl dragged just ahead of him
-      }
-      var girlY2 = ground - girl.h * gScale2 / 2;
-      var diabloY = ground - (diabloSpr ? diabloSpr.h : girl.h) * dScale / 2;
-
-      drawSpr(girl, girlX2, girlY2, gScale2);
-      drawSpr(diabloSpr, diabloX, diabloY, dScale);
-
-      // broken heart over the player once she's taken
-      if (t > grabT) {
-        var bp = easeOut((t - grabT) / 0.6);
+      // helper for the broken heart that hangs over the player on a loss
+      function brokenHeart(px, py, startT, dur) {
+        if (t <= startT) return;
+        var bp = easeOut((t - startT) / (dur || 0.6));
+        var heartSpr = CK.sprites.heart;
         ctx.save();
         ctx.globalAlpha = bp;
-        ctx.fillStyle = '#7a2030';
-        ctx.font = 'bold 56px monospace';
-        ctx.fillText('💔', playerX2, playerY2 - player.h * pScale2 / 2 - 30);
+        if (heartSpr) {
+          // draw the heart, then slice a dark jagged crack down the middle
+          var hs = 5, hw = heartSpr.w * hs;
+          drawSpr(heartSpr, px, py, hs);
+          ctx.fillStyle = '#2a0406';
+          var crackW = Math.max(2, hw * 0.10);
+          ctx.fillRect(Math.round(px - crackW / 2),
+                       Math.round(py - heartSpr.h * hs / 2),
+                       crackW, heartSpr.h * hs);
+        } else {
+          ctx.fillStyle = '#7a2030';
+          ctx.font = 'bold 56px monospace';
+          ctx.fillText('</3', px, py);
+        }
         ctx.restore();
       }
 
-      // text
-      ctx.fillStyle = '#FF5A5A';
+      // friendly (Chicky/Cornelius) vs sinister (Diablo/others) backdrop
+      var friendly = !!(winner && (winner.swerver || winner.throwsHats));
+      var g2 = ctx.createLinearGradient(0, 0, 0, C.height);
+      if (friendly) { g2.addColorStop(0, '#241a3a'); g2.addColorStop(1, '#0d0a16'); }
+      else          { g2.addColorStop(0, '#2a0d12'); g2.addColorStop(1, '#0a0406'); }
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, C.width, C.height);
+
+      var pScale2 = 7, gScale2 = 7, wScale = 7 * winnerScale;
+      var playerX2 = C.width * 0.26;
+      var playerY2 = ground - player.h * pScale2 / 2;
+
+      // your chicken: a startled shake early on, then it just sits there sadly
+      var shake = t < 1.4 ? Math.sin(t * 40) * 3 : 0;
+      drawSpr(player, playerX2 + shake, playerY2, pScale2);
+
+      var girlStart = C.width * 0.52;
+      var girlY2 = ground - girl.h * gScale2 / 2;
+      var wH = winnerSpr ? winnerSpr.h : girl.h;
+      var winnerY = ground - wH * wScale / 2;
+
+      var title1 = '', title2 = '';
+
+      if (winner && winner.big) {
+        // ---- BIG CARL: scoops her up and carries her off-screen ----
+        title1 = 'BIG CARL CARRIES'; title2 = 'YOUR GIRL OFF!';
+        var grabT = 1.4;
+        var carlInX = lerp(C.width + 180, girlStart + 90, easeOut(t / grabT));
+        var carlX, girlX2, carried = 0;
+        if (t < grabT) {
+          carlX = carlInX;
+          girlX2 = girlStart;
+        } else {
+          var off = easeIn((t - grabT) / (3.5 - grabT));
+          carlX = lerp(girlStart + 90, -220, off);
+          girlX2 = carlX - 60;     // tucked just ahead of him
+          carried = 1;
+        }
+        // lift + bob her as if hoisted in his wings
+        var lift = carried ? (60 + Math.sin(t * 8) * 8) : 0;
+        drawSpr(winnerSpr, carlX, winnerY, wScale);
+        drawSpr(girl, girlX2, girlY2 - lift, gScale2);
+        brokenHeart(playerX2, playerY2 - player.h * pScale2 / 2 - 36, grabT);
+
+      } else if (winner && winner.throwsHats) {
+        // ---- CORNELIUS: slides in beside her and tips his hat, then she
+        //      strolls off with him ----
+        title1 = 'CORNELIUS'; title2 = 'TIPS HIS HAT!';
+        var inT = 1.0, tipStart = 1.0, tipEnd = 2.1, walkStart = 2.4;
+        var corX = lerp(C.width + 160, girlStart + 80, easeOut(t / inT));
+        var girlX2c = girlStart;
+        var walk = 0;
+        if (t > walkStart) {
+          // both stroll off to the right together
+          walk = easeIn((t - walkStart) / (3.5 - walkStart));
+          corX = lerp(girlStart + 80, C.width + 200, walk);
+          girlX2c = lerp(girlStart, C.width + 120, walk);
+        }
+        drawSpr(winnerSpr, corX, winnerY, wScale);
+        drawSpr(girl, girlX2c, girlY2, gScale2);
+
+        // the hat lifts up off his head and settles back (a gentlemanly tip)
+        var hat = CK.sprites.hat;
+        if (hat && t > tipStart && t < walkStart) {
+          var phase = clamp01((t - tipStart) / (tipEnd - tipStart));
+          var up = Math.sin(phase * Math.PI) * 46;        // rise then settle
+          var hatScale = 5;
+          var hatX = corX;
+          var hatY = winnerY - wH * wScale / 2 - 18 - up;
+          drawSpr(hat, hatX, hatY, hatScale);
+        }
+
+        // gentlemanly hearts float up between them
+        var heartC = CK.sprites.heart;
+        for (var ci = 0; ci < 5; ci++) {
+          var cp = (t * 0.5 + ci / 5) % 1;
+          var cx = (corX + girlX2c) / 2 + Math.sin(t * 1.6 + ci * 1.9) * 50;
+          var cy = ground - cp * (C.height * 0.5);
+          ctx.save();
+          ctx.globalAlpha = clamp01(1 - cp) * 0.9;
+          if (heartC) drawSpr(heartC, cx, cy, 2.6 + Math.sin(t * 4 + ci) * 0.5);
+          ctx.restore();
+        }
+
+      } else if (winner && winner.swerver) {
+        // ---- CHICKY: happily walks off shoe shopping with your girl ----
+        title1 = 'CHICKY TAKES YOUR GIRL'; title2 = 'SHOE SHOPPING!';
+        // they pair up early, then stroll off toward the shops (right) together
+        var meetT = 1.0, goT = 1.3;
+        var chkX = lerp(C.width + 150, girlStart + 80, easeOut(t / meetT));
+        var girlX2s = girlStart;
+        var stroll = 0;
+        if (t > goT) {
+          stroll = easeIn((t - goT) / (3.5 - goT));
+          chkX = lerp(girlStart + 80, C.width + 200, stroll);
+          girlX2s = lerp(girlStart, C.width + 120, stroll);
+        }
+        var bobC = Math.sin(t * 9) * 5;   // happy bounce as they walk
+        var bobG = Math.sin(t * 9 + 1) * 5;
+        drawSpr(winnerSpr, chkX, winnerY + bobC, wScale);
+        drawSpr(girl, girlX2s, girlY2 + bobG, gScale2);
+
+        // shopping props bobbing along between them
+        var shoe = CK.sprites.shoe, bag = CK.sprites.bag;
+        var midX = (chkX + girlX2s) / 2;
+        if (bag) drawSpr(bag, midX, ground - 70 + bobG, 4.0);
+        if (shoe) drawSpr(shoe, girlX2s + 30, ground - 30, 3.2);
+
+        // sparkles + hearts (lighthearted)
+        for (var si = 0; si < 7; si++) {
+          var sp = (t * 0.55 + si / 7) % 1;
+          var sx = midX + Math.sin(t * 1.8 + si * 1.5) * (60 + si * 10);
+          var sy = ground - sp * (C.height * 0.55);
+          ctx.save();
+          ctx.globalAlpha = clamp01(1 - sp) * 0.9;
+          if (si % 2 === 0 && CK.sprites.heart) {
+            drawSpr(CK.sprites.heart, sx, sy, 2.4);
+          } else {
+            ctx.fillStyle = '#FFE15A';
+            ctx.font = 'bold 22px monospace';
+            ctx.fillText('*', sx, sy);
+          }
+          ctx.restore();
+        }
+
+      } else if (winner && winner.evil) {
+        // ---- DIABLO: grabs her, drags her off, broken heart over you ----
+        title1 = 'DIABLO STOLE'; title2 = 'YOUR GIRL!';
+        var grabTd = 1.4;
+        var diabloInX = lerp(C.width + 140, girlStart + 70, easeOut(t / grabTd));
+        var girlX2d, diabloX;
+        if (t < grabTd) {
+          girlX2d = girlStart + Math.sin(t * 30) * 2;   // trembling
+          diabloX = diabloInX;
+        } else {
+          var offd = easeIn((t - grabTd) / (3.5 - grabTd));
+          diabloX = lerp(girlStart + 70, -160, offd);
+          girlX2d = diabloX - 70;                        // dragged ahead of him
+        }
+        drawSpr(girl, girlX2d, girlY2, gScale2);
+        drawSpr(winnerSpr, diabloX, winnerY, wScale);
+        brokenHeart(playerX2, playerY2 - player.h * pScale2 / 2 - 36, grabTd);
+
+      } else {
+        // ---- GENERIC (Peewee / unknown / winner missing): leads her away ----
+        var wname = (winner && winner.name) ? winner.name : 'The winner';
+        title1 = wname.toUpperCase() + ' STOLE'; title2 = 'YOUR GIRL!';
+        var grabTg = 1.4;
+        var inX = lerp(C.width + 150, girlStart + 70, easeOut(t / grabTg));
+        var girlX2g, wX;
+        if (t < grabTg) {
+          girlX2g = girlStart + Math.sin(t * 28) * 2;
+          wX = inX;
+        } else {
+          var offg = easeIn((t - grabTg) / (3.5 - grabTg));
+          wX = lerp(girlStart + 70, -160, offg);
+          girlX2g = wX - 70;
+        }
+        drawSpr(girl, girlX2g, girlY2, gScale2);
+        if (winnerSpr) drawSpr(winnerSpr, wX, winnerY, wScale);
+        brokenHeart(playerX2, playerY2 - player.h * pScale2 / 2 - 36, grabTg);
+      }
+
+      // ---- title text (bold, centered, readable on 1024x576) ----
+      var pop = easeOut(t / 0.45);
+      ctx.save();
+      ctx.globalAlpha = pop;
+      ctx.fillStyle = friendly ? '#FF6FB5' : '#FF5A5A';
       ctx.font = 'bold 70px monospace';
-      ctx.fillText('!?', C.width / 2, 64);
+      ctx.fillText(friendly ? '!' : '!?', C.width / 2, 56);
+      ctx.restore();
+
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 36px monospace';
-      ctx.fillText('DIABLO STOLE', C.width / 2, C.height - 86);
-      ctx.fillStyle = '#FF5A5A';
-      ctx.fillText('YOUR GIRL!', C.width / 2, C.height - 44);
+      ctx.font = 'bold 34px monospace';
+      ctx.fillText(title1, C.width / 2, C.height - 86);
+      ctx.fillStyle = friendly ? '#FF6FB5' : '#FF5A5A';
+      ctx.fillText(title2, C.width / 2, C.height - 44);
     }
 
     ctx.textBaseline = 'top';

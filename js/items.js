@@ -198,8 +198,13 @@ CK.updateItems = function (dt) {
           Math.abs(p.x - col.offset) < 0.4) {
         CK.carSfx.smash();
         smashCd = 0.5;
-        // Hitting Diablo makes him fume: raise his fist + pour smoke.
-        if (col.evil) col.angryTimer = 2.0;
+        // Any bumped chicken fumes; Diablo additionally gets his raised-fist sprite.
+        col.angryTimer = 2.0;
+        // Big Carl's hit knocks the player roughly two lanes sideways.
+        if (col.big) {
+          var dir = (CK.player.x >= col.offset) ? 1 : -1; // knock away from Carl
+          CK.player.x = clamp(CK.player.x + dir * 2 * (2 / CK.C.lanes), -2, 2);
+        }
         break;
       }
     }
@@ -233,8 +238,8 @@ CK.updateItems = function (dt) {
       var rLat = r.isPlayer ? r.x : r.offset;
       if (Math.abs(forwardGap(r.z, egg.z)) < ztol && Math.abs(rLat - egg.offset) < 0.4) {
         r.spinTimer = 1.6;
-        // The player egging Diablo makes him fume: raise his fist + pour smoke.
-        if (r.evil && egg.owner && egg.owner.isPlayer) r.angryTimer = 2.0;
+        // Any AI racer hit by a player egg fumes; Diablo additionally gets his fist sprite.
+        if (!r.isPlayer && egg.owner && egg.owner.isPlayer) r.angryTimer = 2.0;
         if (r.isPlayer) {
           r.score -= 2;
           r.splatTimer = 1.0;

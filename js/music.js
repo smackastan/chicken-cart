@@ -86,97 +86,115 @@ CK.music = CK.music || {};
             'k', 'h', 's', 'k', 'k', 'h', 's', 'h']
   };
 
-  // ---- RACE: Mozart "Eine kleine Nachtmusik" K.525, 1st mvt (Allegro) --------
-  // The iconic public-domain opening theme in G major: the bright ascending
-  // "Mannheim rocket" (G-D-G-D / G-B-D) answered by its higher echo, then the
-  // descending phrase and the busy running figures of the following bars. Driving
-  // and energetic for race music, with an octave-bouncing bass and a four-on-the
-  // -floor groove. step = one sixteenth @ 0.15625s -> 96 BPM quarter note;
-  // 24 bars * 16 = 384 steps; 384 * 0.15625 = 60.0000s. The step index wraps to
-  // 0 with no gap -> seamless 60s loop. lead/bass/drums are all 384 long.
+  // ---- RACE: Beethoven Symphony No. 5 in C minor, Op. 67, 1st mvt -------------
+  //          (Allegro con brio) -- composed 1808, long PUBLIC DOMAIN.
+  // The most famous opening in music: the four-note "short-short-short-LONG"
+  // Fate motif -- G-G-G-Eb, then a step lower F-F-F-D (in C minor) -- here as a
+  // driving, urgent race anthem. The arrangement opens with the bare motif, then
+  // develops it the way the first movement does: the motif is repeated, sequenced
+  // up and down the C-minor scale, climbs in a rising fugato-style chain, and is
+  // hammered home before the loop wraps straight back into the opening G-G-G-Eb.
+  // Square lead carries the motif; an octave-bouncing triangle bass holds the
+  // C-minor harmony (Cm tonic, G/G7 dominant, Ab/Fm/Eb supports); a light drum
+  // groove drives without burying the melody. Key: C minor. step = one sixteenth
+  // @ 0.15625s -> 96 BPM quarter note. 24 bars * 16 = 384 steps;
+  // 384 * 0.15625 = 60.0000s. The step index wraps to 0 with no gap -> seamless
+  // 60.0000s loop. lead/bass/drums are all exactly 384 long.
   var RACE = (function () {
     var stepDur = 0.15625; // 0.625s quarter note -> 96 BPM; 1 step = one 16th
     var L = [], B = [], D = [];
 
-    // --- Lead: faithful transcription of the opening theme, 16 steps per bar.
-    // Eighth note = 2 steps (note + 'R' for a crisp staccato attack); quarter
-    // note = note + three 'R'. 'R' = rest.
-    // Bar 1: rocket up  G D G D | G B D(qtr)
-    var leadA1 = ['G5', 'R', 'D5', 'R', 'G5', 'R', 'D5', 'R',
-                  'G5', 'R', 'B5', 'R', 'D6', 'R', 'R', 'R'];
-    // Bar 2: rocket echo  C A C A | C E G(qtr)
-    var leadA2 = ['C6', 'R', 'A5', 'R', 'C6', 'R', 'A5', 'R',
-                  'C6', 'R', 'E6', 'R', 'G6', 'R', 'R', 'R'];
-    // Bar 3: descending answer  D6 C6 B5 A5 (16ths) G5 A5 B5 C6 (16ths)
-    var leadA3 = ['D6', 'C6', 'B5', 'A5', 'G5', 'A5', 'B5', 'C6',
-                  'D6', 'R',  'D5', 'R',  'D5', 'R',  'R',  'R'];
-    // Bar 4: cadence  C6(8th) B5(8th) A5(8th) G5(8th) | A5(8th) D5(8th) [rest]
-    var leadA4 = ['C6', 'R', 'B5', 'R', 'A5', 'R', 'G5', 'R',
-                  'A5', 'R', 'D5', 'R', 'G5', 'R', 'R',  'R'];
+    // --- Lead: faithful transcription of the Fate motif and its development,
+    // 16 steps per bar. The three "short" notes are eighth notes (note + 'R' for
+    // a crisp staccato attack); the "LONG" note is held over several steps by
+    // repeating its name. 'R' = rest. Each motif statement = G G G Eb----- style:
+    // three quick stabs on the upbeat, then the long fall a step or third below.
 
-    // Bars 5-8: the running passage that follows (rising scalar runs in 16ths,
-    // a recognizable bridge of the Allegro).
-    // Bar 5: G5 A5 B5 C6 D6 E6 F#6 G6 (ascending run) | D6 R D6 R
-    var leadB1 = ['G5', 'A5', 'B5', 'C6', 'D6', 'E6', 'F#6', 'G6',
-                  'D6', 'R',  'B5', 'R',  'G5', 'R',  'R',   'R'];
-    // Bar 6: A5 B5 C6 D6 E6 F#6 G6 A6 | E6 R E6 R
-    var leadB2 = ['A5', 'B5', 'C6', 'D6', 'E6', 'F#6', 'G6', 'A6',
-                  'E6', 'R',  'C6', 'R',  'A5', 'R',   'R',  'R'];
-    // Bar 7: descending  D6 C6 B5 A5 G5 F#5 E5 D5 | G5 R B5 R
-    var leadB3 = ['D6', 'C6', 'B5', 'A5', 'G5', 'F#5', 'E5', 'D5',
-                  'G5', 'R',  'B5', 'R',  'D6', 'R',   'R',  'R'];
-    // Bar 8: cadence to the tonic  C6 B5 A5 G5 | A5 D5 G5(qtr)
-    var leadB4 = ['C6', 'R', 'B5', 'R', 'A5', 'R', 'G5', 'R',
-                  'A5', 'R', 'D5', 'R', 'G5', 'R', 'R',  'R'];
+    // Bars 1-2: the bare iconic motif, twice.
+    // Bar 1: rest-G G G | Eb (held) -- "short short short LONG"
+    var leadA1 = ['R',  'R',  'G4', 'R', 'G4', 'R', 'G4', 'R',
+                  'Eb4','Eb4','Eb4','Eb4','Eb4','Eb4','R',  'R'];
+    // Bar 2: rest-F F F | D (held) -- the answering statement a step lower
+    var leadA2 = ['R',  'R',  'F4', 'R', 'F4', 'R', 'F4', 'R',
+                  'D4', 'D4', 'D4', 'D4', 'D4', 'D4', 'R',  'R'];
 
-    // Bars 9-12: restate the rocket head + a strong cadence (mirrors the opening
-    // so the form stays recognizable mid-loop).
-    var leadC1 = leadA1; // rocket up again
-    var leadC2 = leadA2; // rocket echo again
-    var leadC3 = leadA3; // descending answer
-    // Bar 12: C6 B5 A5 G5 | D5 D5 G5(qtr) -> dominant->tonic close
-    var leadC4 = ['C6', 'R', 'B5', 'R', 'A5', 'R', 'G5', 'R',
-                  'D5', 'R', 'D5', 'R', 'G5', 'R', 'R',  'R'];
+    // Bars 3-4: the motif begins to develop -- restated and pushed upward, the
+    // long note now climbing (the famous repetition that builds tension).
+    // Bar 3: G G G | Eb (held), restated tighter
+    var leadA3 = ['G4', 'R', 'G4', 'R', 'G4', 'R', 'Eb4','R',
+                  'F4', 'R', 'F4', 'R', 'F4', 'R', 'D4', 'R'];
+    // Bar 4: the motif climbs -- Eb-D-C runs up into a held G (rising answer)
+    var leadA4 = ['G4', 'R', 'G4', 'R', 'G4', 'R', 'Ab4','R',
+                  'G4', 'G4', 'G4', 'G4', 'F4', 'F4', 'R',  'R'];
 
-    // Bars 13-16: the bright continuation of the Allegro -- the chattering
-    // repeated-note / turn figures over the dominant (a recognizable second
-    // strain of the first movement), kept buoyant and dance-like.
-    // Bar 13: D6 D6 D6 D6 (repeated 8ths) | E6 D6 C6 B5 (turn)
-    var leadD1 = ['D6', 'R', 'D6', 'R', 'D6', 'R', 'D6', 'R',
-                  'E6', 'R', 'D6', 'R', 'C6', 'B5', 'R', 'R'];
-    // Bar 14: A5 A5 A5 A5 | B5 A5 G5 F#5 (turn down)
-    var leadD2 = ['A5', 'R', 'A5', 'R', 'A5', 'R', 'A5', 'R',
-                  'B5', 'R', 'A5', 'R', 'G5', 'F#5', 'R', 'R'];
-    // Bar 15: rising flourish  G5 B5 D6 G6 | F#6 E6 D6 C6
-    var leadD3 = ['G5', 'R', 'B5', 'R', 'D6', 'R', 'G6', 'R',
-                  'F#6', 'E6', 'D6', 'C6', 'B5', 'A5', 'R', 'R'];
-    // Bar 16: half cadence  B5 A5 G5 F#5 | A5 R D5 R (lands on dominant)
-    var leadD4 = ['B5', 'R', 'A5', 'R', 'G5', 'R', 'F#5', 'R',
-                  'A5', 'R', 'D5', 'R', 'A5', 'R', 'R', 'R'];
+    // Bars 5-8: rising sequence of the motif up the C-minor scale -- each
+    // statement starts a step higher, building the way the development climbs.
+    // Bar 5: Ab Ab Ab | F (held) -- sequence up
+    var leadB1 = ['R',  'R',  'Ab4','R', 'Ab4','R', 'Ab4','R',
+                  'F4', 'F4', 'F4', 'F4', 'F4', 'F4', 'R',  'R'];
+    // Bar 6: Bb Bb Bb | G (held)
+    var leadB2 = ['R',  'R',  'Bb4','R', 'Bb4','R', 'Bb4','R',
+                  'G4', 'G4', 'G4', 'G4', 'G4', 'G4', 'R',  'R'];
+    // Bar 7: C C C | Ab (held) -- motif now an octave up from the opening
+    var leadB3 = ['R',  'R',  'C5', 'R', 'C5', 'R', 'C5', 'R',
+                  'Ab4','Ab4','Ab4','Ab4','Ab4','Ab4','R',  'R'];
+    // Bar 8: D D D | Bb (held) -- top of the climb, leaning on the dominant
+    var leadB4 = ['R',  'R',  'D5', 'R', 'D5', 'R', 'D5', 'R',
+                  'Bb4','Bb4','Bb4','Bb4','Bb4','Bb4','R',  'R'];
 
-    // Bars 17-20: lyrical descending sequence answering the second strain,
-    // walking the scale back toward the tonic with light syncopation.
-    // Bar 17: E6 D6 C6 B5 | A5 G5 F#5 E5 (descending run)
-    var leadE1 = ['E6', 'D6', 'C6', 'B5', 'A5', 'G5', 'F#5', 'E5',
-                  'D5', 'R',  'B5', 'R',  'G5', 'R',  'R',   'R'];
-    // Bar 18: C6 B5 A5 G5 | F#5 G5 A5 B5 (turn and recover)
-    var leadE2 = ['C6', 'B5', 'A5', 'G5', 'F#5', 'G5', 'A5', 'B5',
-                  'C6', 'R',  'A5', 'R',  'D5', 'R',   'R',  'R'];
-    // Bar 19: ascending answer  D5 E5 F#5 G5 | A5 B5 C6 D6
-    var leadE3 = ['D5', 'E5', 'F#5', 'G5', 'A5', 'B5', 'C6', 'D6',
-                  'E6', 'R',  'C6',  'R',  'A5', 'R',  'R',  'R'];
-    // Bar 20: cadence  E6 D6 C6 B5 | A5 D5 G5(qtr) -> back to tonic
-    var leadE4 = ['E6', 'R', 'D6', 'R', 'C6', 'R', 'B5', 'R',
-                  'A5', 'R', 'D5', 'R', 'G5', 'R', 'R',  'R'];
+    // Bars 9-12: high restatement of the head motif up the octave (mirrors the
+    // opening so the form stays recognizable mid-loop), then a turn back down.
+    // Bar 9: rest-G G G | Eb (held), octave up
+    var leadC1 = ['R',  'R',  'G5', 'R', 'G5', 'R', 'G5', 'R',
+                  'Eb5','Eb5','Eb5','Eb5','Eb5','Eb5','R',  'R'];
+    // Bar 10: rest-F F F | D (held), octave up
+    var leadC2 = ['R',  'R',  'F5', 'R', 'F5', 'R', 'F5', 'R',
+                  'D5', 'D5', 'D5', 'D5', 'D5', 'D5', 'R',  'R'];
+    // Bar 11: descending chain  Eb D C Bb | Ab G F Eb (16th run from the motif)
+    var leadC3 = ['Eb5','D5', 'C5', 'Bb4','Ab4','G4', 'F4', 'Eb4',
+                  'D4', 'R',  'D4', 'R',  'G4', 'R',  'G4', 'R'];
+    // Bar 12: C C C | (held G->) -> motif lands, pivoting to the dominant G
+    var leadC4 = ['C5', 'R', 'C5', 'R', 'C5', 'R', 'C5', 'R',
+                  'G4', 'G4', 'G4', 'G4', 'G4', 'G4', 'R',  'R'];
 
-    // Bars 21-24: final restatement of the rocket head, then a strong perfect
-    // cadence that rounds the loop back to bar 1 so it wraps cleanly.
-    var leadF1 = leadA1; // rocket up
-    var leadF2 = leadA2; // rocket echo
-    var leadF3 = leadA3; // descending answer
-    // Bar 24 final: C6 B5 A5 G5 | D5 D5 G5(qtr) -> dominant->tonic close
-    var leadF4 = ['C6', 'R', 'B5', 'R', 'A5', 'R', 'G5', 'R',
-                  'D5', 'R', 'D5', 'R', 'G5', 'R', 'R',  'R'];
+    // Bars 13-16: the driving development -- the motif tossed between octaves and
+    // hammered as repeated stabs, the famous insistent passage of the Allegro.
+    // Bar 13: G G G G | G G G G (relentless dominant pedal stabs)
+    var leadD1 = ['G5', 'R', 'G5', 'R', 'G5', 'R', 'G5', 'R',
+                  'G4', 'R', 'G4', 'R', 'G4', 'R', 'G4', 'R'];
+    // Bar 14: Ab Ab Ab | G (held) -- the leaning Neapolitan-ish push down to G
+    var leadD2 = ['Ab5','R', 'Ab5','R', 'Ab5','R', 'G5', 'R',
+                  'F5', 'R', 'F5', 'R', 'Eb5','R', 'D5', 'R'];
+    // Bar 15: C C C | Eb (held) -- the motif again, restated up high
+    var leadD3 = ['R',  'R',  'C5', 'R', 'C5', 'R', 'C5', 'R',
+                  'Eb5','Eb5','Eb5','Eb5','D5', 'D5', 'R',  'R'];
+    // Bar 16: G G G | G (held) -- big dominant arrival (half cadence)
+    var leadD4 = ['R',  'R',  'G5', 'R', 'G5', 'R', 'G5', 'R',
+                  'G5', 'G5', 'G5', 'G5', 'G5', 'G5', 'R',  'R'];
+
+    // Bars 17-20: recapitulation feel -- the motif returns in the home register,
+    // sequenced once more then driven toward the cadence.
+    var leadE1 = leadA1;            // bare motif: G G G | Eb
+    var leadE2 = leadA2;            // answer:     F F F | D
+    // Bar 19: rising run rebuilding tension  Eb F G Ab | Bb C D Eb
+    var leadE3 = ['Eb4','F4','G4', 'Ab4','Bb4','C5', 'D5', 'Eb5',
+                  'D5', 'R', 'C5', 'R',  'Bb4','R',  'R',  'R'];
+    // Bar 20: C C C | (long G) -> the motif lands and pivots to the dominant
+    var leadE4 = ['C5', 'R', 'C5', 'R', 'C5', 'R', 'C5', 'R',
+                  'G4', 'G4', 'G4', 'G4', 'G4', 'G4', 'R',  'R'];
+
+    // Bars 21-24: final hammering of the Fate motif and a strong perfect cadence
+    // (G7 -> Cm) that rounds the loop straight back into bar 1's opening motif.
+    // Bar 21: G G G | Eb (held) -- the motif, fortissimo restatement
+    var leadF1 = leadA1;
+    // Bar 22: F F F | D (held)
+    var leadF2 = leadA2;
+    // Bar 23: descending drive  Eb D C Bb | Ab G F Eb  into the cadence
+    var leadF3 = ['Eb5','D5', 'C5', 'Bb4','Ab4','G4', 'F4', 'Eb4',
+                  'D4', 'R',  'F4', 'R',  'D4', 'R',  'R',  'R'];
+    // Bar 24 final: G G G | C (held) -> dominant->tonic close, then wrap to bar 1
+    var leadF4 = ['G4', 'R', 'G4', 'R', 'G4', 'R', 'G4', 'R',
+                  'C4', 'C4', 'C4', 'C4', 'C4', 'C4', 'R',  'R'];
 
     // Octave-bouncing bass: root on the downbeat eighth, octave-up on the next.
     function bassBar(lo, hi) {
@@ -200,21 +218,21 @@ CK.music = CK.music || {};
       return r;
     }
 
-    // 24-bar form. Harmony follows the theme: G = tonic, D = dominant, with the
-    // continuation strain (bars 13-16) leaning on the dominant and the lyrical
-    // sequence (bars 17-20) walking G -> D -> G back home.
+    // 24-bar form. Harmony follows the theme in C minor: C = tonic (Cm), G = the
+    // dominant (G/G7), with Ab / Eb / Bb / F supporting the rising development
+    // sequence, all resolving G -> C at the end so the loop wraps cleanly.
     var leads = [leadA1, leadA2, leadA3, leadA4,
                  leadB1, leadB2, leadB3, leadB4,
                  leadC1, leadC2, leadC3, leadC4,
                  leadD1, leadD2, leadD3, leadD4,
                  leadE1, leadE2, leadE3, leadE4,
                  leadF1, leadF2, leadF3, leadF4];
-    var bassLo = ['G1', 'G1', 'G1', 'D2', 'G1', 'D2', 'G1', 'D2',
-                  'G1', 'G1', 'G1', 'D2', 'D2', 'D2', 'G1', 'D2',
-                  'G1', 'D2', 'G1', 'D2', 'G1', 'G1', 'G1', 'D2'];
-    var bassHi = ['G2', 'G2', 'D2', 'G2', 'G2', 'A2', 'D2', 'G2',
-                  'G2', 'G2', 'D2', 'G2', 'A2', 'A2', 'D2', 'A2',
-                  'D2', 'A2', 'D2', 'G2', 'G2', 'G2', 'D2', 'G2'];
+    var bassLo = ['C2', 'C2', 'C2', 'C2', 'F2', 'G1', 'C2', 'G1',
+                  'C2', 'C2', 'G1', 'C2', 'G1', 'G1', 'C2', 'G1',
+                  'C2', 'C2', 'C2', 'G1', 'C2', 'C2', 'C2', 'G1'];
+    var bassHi = ['C3', 'C3', 'C3', 'G2', 'F2', 'G2', 'C3', 'G2',
+                  'C3', 'C3', 'G2', 'C3', 'G2', 'G2', 'C3', 'G2',
+                  'C3', 'C3', 'G2', 'G2', 'C3', 'C3', 'G2', 'G2'];
 
     for (var bar = 0; bar < 24; bar++) {
       L = L.concat(leads[bar]);
@@ -458,8 +476,8 @@ CK.music = CK.music || {};
       if (st === STATE.COUNTDOWN) return null; // brief -> silence
       if (st === STATE.FINISHED) {
         if (CK.outcome === 'win') return 'win';
-        if (CK.outcome === 'loseToDiablo') return 'lose';
-        return null; // 'normal' or unset finish -> no music
+        if (CK.outcome === 'lose') return 'lose';
+        return null; // unset finish -> no music
       }
       return null;
     } catch (e) {

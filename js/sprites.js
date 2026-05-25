@@ -244,6 +244,39 @@ var HEART_GRID = [
   "....H...."
 ];
 
+// A little high-heeled shoe (side profile, toe to the right) for Chicky's
+// shoe-shopping scene. 'S' = shoe body, 's' = shoe shade, 'O' = dark outline.
+var SHOE_GRID = [
+  "..........OO..",
+  ".........OSSO.",
+  ".OOOO...OSSSO.",
+  "OSSSSO.OSSSSO.",
+  "OSSSSSSSSSSSO.",
+  "OSsssssssssSO.",
+  ".OOOOOOOOOOO..",
+  ".......O......",
+  "......OsO.....",
+  "......OsO.....",
+  ".....OsO......",
+  "...OOOO......."
+];
+
+// A shopping bag with handles for Chicky's shoe-shopping scene.
+// 'G' = bag body, 'g' = bag shade, 'O' = handle/outline, 'i' = label dot.
+var BAG_GRID = [
+  "..O.....O..",
+  ".O.O...O.O.",
+  ".O..O.O..O.",
+  "OOOOOOOOOOO",
+  "OGGGGGGGGGO",
+  "OGGGiGiGGGO",
+  "OGGGGGGGGGO",
+  "OGgGGGGGgGO",
+  "OGgGGGGGgGO",
+  "OGgGGGGGgGO",
+  "OOOOOOOOOOO"
+];
+
 function makeSprite(grid, palette) {
   var h = grid.length, w = grid[0].length;
   var cv = document.createElement('canvas');
@@ -464,6 +497,8 @@ CK.buildSprites = function () {
       'K': '#E89A2B'    // legs / feet
     }),
     heart: makeSprite(HEART_GRID, { '.': null, 'H': '#FF3B6B' }),
+    shoe: makeSprite(SHOE_GRID, { '.': null, 'O': '#7a1438', 'S': '#FF4F8B', 's': '#D1376E' }),
+    bag: makeSprite(BAG_GRID, { '.': null, 'O': '#3a2a44', 'G': '#FF8FC8', 'g': '#E36FAE', 'i': '#FFE15A' }),
     egg: makeSprite(EGG_GRID, { '.': null, 'O': '#1a1a1a', 'W': '#FFFFFF', 'h': '#CFEFFF' }),
     hat: makeSprite(HAT_PROJECTILE_GRID, { '.': null, 'O': '#000000', 'H': '#101014', 'h': '#8a1212' }),
     boxes: {
